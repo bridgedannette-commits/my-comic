@@ -145,27 +145,24 @@ function applyZoom(delta) {
   const next = zoom + delta;
   if (next < MIN_ZOOM || next > MAX_ZOOM) return;
 
+  // Получаем центр видимой области
+  const wrapperRect = wrapper.getBoundingClientRect();
+  const centerY = wrapper.scrollTop + wrapperRect.height / 2;
+
+  // Вычисляем относительную позицию к текущему canvas
+  const canvasRect = canvas.getBoundingClientRect();
+  const relCenterY = centerY - canvasRect.top;
+
+  // Применяем масштаб
   zoom = +next.toFixed(2);
+  canvas.style.transform = `scale(${zoom})`;
 
-  // Центрируем canvas горизонтально через scrollLeft
-  if (isDesktop()) {
-    const wrapperRect = wrapper.getBoundingClientRect();
-    const centerX = wrapper.scrollLeft + wrapperRect.width / 2;
+  // После применения масштаба подстраиваем scrollTop, чтобы центр остался на месте
+  const newCanvasRect = canvas.getBoundingClientRect();
+  const newRelCenterY = relCenterY * zoom / (zoom - delta);
+  wrapper.scrollTop += newRelCenterY - relCenterY;
 
-    // Запоминаем центр
-    const oldCenter = centerX / zoom;
-
-    canvas.style.transform = `scale(${zoom})`;
-
-    // Прокрутка, чтобы центр остался на месте
-    const newCenter = oldCenter * zoom;
-    wrapper.scrollLeft = newCenter - wrapperRect.width / 2;
-  } else {
-    // Мобильный: верхний центр
-    canvas.style.transformOrigin = '50% 0%';
-    canvas.style.transform = `scale(${zoom})`;
-  }
-
+  // Обновляем индикатор
   zoomPercent.textContent = `${Math.round(zoom * 100)}%`;
   zoomIndicator.classList.add('visible');
 
@@ -174,6 +171,7 @@ function applyZoom(delta) {
     zoomIndicator.classList.remove('visible');
   }, 1500);
 }
+
 
 /* ======================================================
    СТРАНИЦЫ
