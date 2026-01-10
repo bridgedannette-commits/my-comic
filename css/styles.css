@@ -35,7 +35,7 @@ html, body {
 }
 
 /* Контейнер для canvas должен центрировать комикс */
-/*.canvas-wrapper {
+.canvas-wrapper {
   flex: 1;
   overflow-y: auto;
   background: #111;
@@ -51,14 +51,14 @@ html, body {
   height: 100%;
   scrollbar-width: none;
   -ms-overflow-style: none;
-} */
+} 
 
 .canvas-wrapper::-webkit-scrollbar {
   display: none;
 }
 
 /* Canvas комикса остаётся прежнего размера */
-/*canvas {
+canvas {
   display: block;
   background: #111;
   margin: 0 auto !important;
@@ -68,7 +68,7 @@ html, body {
   box-shadow: none;
   cursor: grab;
   max-width: 100% !important;
-}  */
+}  
 
 canvas:active {
   cursor: grabbing;
