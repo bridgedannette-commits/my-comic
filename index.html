@@ -15,9 +15,8 @@
 <body>
 
 <div class="comic-reader" id="reader">
-
   <div class="canvas-wrapper" id="canvasWrapper">
-    <div class="comic-canvas" id="comicCanvas"></div>
+    <!-- Страницы будут добавляться сюда -->
   </div>
 
   <div class="zoom-indicator" id="zoomIndicator">
@@ -26,58 +25,55 @@
 
   <div class="controls-wrapper">
     <div class="controls" id="controls">
-      <button id="toTop" title="В начало" class="nav-btn">▲</button>
-      <button id="zoomOut" title="Уменьшить" class="zoom-btn">−</button>
+      <button id="toTop" title="В начало">▲</button>
+      <button id="zoomOut" title="Уменьшить">−</button>
       <span id="pageInfo">– / –</span>
-      <button id="zoomIn" title="Увеличить" class="zoom-btn">+</button>
-      <button id="toBottom" title="В конец" class="nav-btn">▼</button>
+      <button id="zoomIn" title="Увеличить">+</button>
+      <button id="toBottom" title="В конец">▼</button>
     </div>
   </div>
 
   <div class="progress">
     <div class="progress-bar" id="progressBar"></div>
   </div>
-
 </div>
 
 <script>
 /* ======================================================
-   НАСТРОЙКИ
+   КОНФИГУРАЦИЯ
 ====================================================== */
-
 const COMIC_PATH = 'https://bridgedannette-commits.github.io/my-comic/comics/test/';
 const IMAGE_EXTS = ['webp', 'png', 'jpg', 'jpeg'];
+const MAX_PAGES_SAFE = 500;
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3.0;
 const ZOOM_STEP = 0.2;
 
-const MAX_PAGES_SAFE = 500;
-
-// Определяем мобильное устройство
-const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth <= 768;
+const isMobile = window.innerWidth <= 768;
 const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-const isAndroid = /Android/i.test(navigator.userAgent);
 
 /* ======================================================
    СОСТОЯНИЕ
 ====================================================== */
-
-let zoom = 1;
+let zoom = 1.0;
 let pages = [];
+let images = []; // Массив загруженных изображений
+let isDragging = false;
+let startY = 0;
+let startScrollTop = 0;
 
 const wrapper = document.getElementById('canvasWrapper');
-const canvas = document.getElementById('comicCanvas');
 const pageInfo = document.getElementById('pageInfo');
 const progressBar = document.getElementById('progressBar');
 const zoomIndicator = document.getElementById('zoomIndicator');
 const zoomPercent = document.getElementById('zoomPercent');
-const controls = document.getElementById('controls');
 
 /* ======================================================
-   ВСПОМОГАТЕЛЬНЫЕ
+   ОСНОВНЫЕ ФУНКЦИИ
 ====================================================== */
 
+// Проверка существования изображения
 async function imageExists(url) {
   try {
     const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
@@ -87,49 +83,7 @@ async function imageExists(url) {
   }
 }
 
-// Получаем максимальную ширину для мобильных
-function getMaxWidth() {
-  if (isMobile) {
-    return Math.min(800, window.innerWidth * 0.98); // 98% ширины экрана
-  }
-  return Math.min(1000, window.innerWidth * 0.95);
-}
-
-// Применяем правильные размеры к изображениям
-function applyImageSizing() {
-  const maxWidth = getMaxWidth();
-  const pageElements = canvas.querySelectorAll('.comic-page');
-  
-  pageElements.forEach(page => {
-    const img = page.querySelector('img');
-    if (!img) return;
-    
-    // Получаем натуральные размеры
-    const naturalWidth = img.naturalWidth || 1;
-    const naturalHeight = img.naturalHeight || 1;
-    
-    // Вычисляем пропорциональную высоту
-    const displayWidth = Math.min(maxWidth * zoom, window.innerWidth * 0.98);
-    const scaleFactor = displayWidth / naturalWidth;
-    const displayHeight = naturalHeight * scaleFactor;
-    
-    // Устанавливаем размеры
-    img.style.width = `${displayWidth}px`;
-    img.style.height = `${displayHeight}px`;
-    img.style.maxWidth = '100%';
-    img.style.display = 'block';
-    
-    // Устанавливаем размеры контейнера
-    page.style.width = `${displayWidth}px`;
-    page.style.height = `${displayHeight}px`;
-    page.style.margin = '0 auto 20px';
-  });
-}
-
-/* ======================================================
-   АВТОПОИСК СТРАНИЦ
-====================================================== */
-
+// Поиск всех страниц
 async function detectPages() {
   const result = [];
   let pageNum = 1;
@@ -140,7 +94,7 @@ async function detectPages() {
     for (const ext of IMAGE_EXTS) {
       const url = `${COMIC_PATH}${pageNum}.${ext}`;
       if (await imageExists(url)) {
-        result.push(url);
+        result.push({ url, num: pageNum, ext });
         found = true;
         break;
       }
@@ -153,251 +107,374 @@ async function detectPages() {
   return result;
 }
 
-/* ======================================================
-   ЗАГРУЗКА КОМИКСА
-====================================================== */
-
+// Загрузка комикса
 async function loadComic() {
-  canvas.innerHTML = '<div style="color: #ccc; text-align: center; padding: 50px;">Загрузка комикса...</div>';
-
+  wrapper.innerHTML = '<div style="color:#ccc;text-align:center;padding:50px;">Загрузка...</div>';
+  
   pages = await detectPages();
   
   if (pages.length === 0) {
-    canvas.innerHTML = '<div style="color: #fff; text-align: center; padding: 50px;">Комикс не найден</div>';
+    wrapper.innerHTML = '<div style="color:#fff;text-align:center;padding:50px;">Комикс не найден</div>';
     return;
   }
-
-  canvas.innerHTML = '';
-
-  pages.forEach((src, index) => {
-    const page = document.createElement('div');
-    page.className = 'comic-page';
-    page.dataset.page = index + 1;
-
+  
+  wrapper.innerHTML = '';
+  images = new Array(pages.length);
+  
+  // Создаем контейнеры для всех страниц сразу
+  pages.forEach((page, index) => {
+    const pageDiv = document.createElement('div');
+    pageDiv.className = 'page-container';
+    pageDiv.id = `page-${page.num}`;
+    pageDiv.style.margin = '0 auto';
+    pageDiv.style.padding = '0';
+    
     const img = document.createElement('img');
-    img.src = src;
     img.loading = 'lazy';
     img.draggable = false;
-    img.onload = () => {
-      // После загрузки применяем правильные размеры
-      applyImageSizing();
+    img.alt = `Страница ${page.num}`;
+    img.style.display = 'block';
+    img.style.margin = '0';
+    img.style.padding = '0';
+    img.style.width = '100%';
+    img.style.height = 'auto';
+    
+    // Предзагрузка для плавности
+    if (index < 3) {
+      img.src = page.url;
+    } else {
+      img.dataset.src = page.url;
+    }
+    
+    img.onload = function() {
+      images[index] = this;
+      applyZoomToImage(this);
     };
-
-    page.appendChild(img);
-    canvas.appendChild(page);
+    
+    pageDiv.appendChild(img);
+    wrapper.appendChild(pageDiv);
   });
-
-  updatePageInfo();
   
-  // Принудительно показываем кнопки на мобильных
-  if (isMobile) {
-    controls.style.opacity = '1';
-    controls.style.visibility = 'visible';
-    document.querySelector('.progress').style.opacity = '1';
-  }
+  updatePageInfo();
+  applyZoomToAll(); // Применяем начальный зум
+  
+  // Загружаем остальные изображения
+  setTimeout(() => loadRemainingImages(), 100);
+}
+
+// Загрузка оставшихся изображений
+function loadRemainingImages() {
+  const imgs = wrapper.querySelectorAll('img[data-src]');
+  imgs.forEach(img => {
+    img.src = img.dataset.src;
+    delete img.dataset.src;
+  });
 }
 
 /* ======================================================
-   ZOOM
+   МАСШТАБИРОВАНИЕ (ИСПРАВЛЕННОЕ)
 ====================================================== */
 
-function applyZoom(delta) {
-  const next = zoom + delta;
-  if (next < MIN_ZOOM || next > MAX_ZOOM) return;
+// Получаем базовую ширину
+function getBaseWidth() {
+  if (isMobile) {
+    return Math.min(800, window.innerWidth - 20);
+  }
+  return Math.min(1000, window.innerWidth * 0.9);
+}
 
-  zoom = +next.toFixed(2);
+// Применяем зум к одному изображению
+function applyZoomToImage(img) {
+  if (!img.naturalWidth) return;
   
-  // Применяем новый размер ко всем изображениям
-  applyImageSizing();
+  const baseWidth = getBaseWidth();
+  const naturalWidth = img.naturalWidth;
+  const naturalHeight = img.naturalHeight;
   
-  // Показываем индикатор зума
-  zoomPercent.textContent = `${Math.round(zoom * 100)}%`;
+  // Вычисляем ширину с учетом зума
+  const displayWidth = Math.floor(baseWidth * zoom);
+  const scale = displayWidth / naturalWidth;
+  const displayHeight = Math.floor(naturalHeight * scale);
+  
+  // Устанавливаем размеры
+  img.style.width = displayWidth + 'px';
+  img.style.height = displayHeight + 'px';
+  
+  // Устанавливаем размеры родительского контейнера
+  const container = img.parentElement;
+  if (container) {
+    container.style.width = displayWidth + 'px';
+    container.style.height = displayHeight + 'px';
+  }
+}
+
+// Применяем зум ко всем изображениям
+function applyZoomToAll() {
+  const baseWidth = getBaseWidth();
+  const displayWidth = Math.floor(baseWidth * zoom);
+  
+  images.forEach(img => {
+    if (img && img.naturalWidth) {
+      const naturalWidth = img.naturalWidth;
+      const naturalHeight = img.naturalHeight;
+      const scale = displayWidth / naturalWidth;
+      const displayHeight = Math.floor(naturalHeight * scale);
+      
+      img.style.width = displayWidth + 'px';
+      img.style.height = displayHeight + 'px';
+      
+      const container = img.parentElement;
+      if (container) {
+        container.style.width = displayWidth + 'px';
+        container.style.height = displayHeight + 'px';
+      }
+    }
+  });
+  
+  showZoomIndicator();
+}
+
+// Изменение зума
+function changeZoom(delta) {
+  const newZoom = zoom + delta;
+  
+  if (newZoom < MIN_ZOOM || newZoom > MAX_ZOOM) {
+    return;
+  }
+  
+  zoom = Math.round(newZoom * 100) / 100;
+  
+  // Сохраняем текущую позицию прокрутки
+  const scrollRatio = wrapper.scrollTop / (wrapper.scrollHeight - wrapper.clientHeight);
+  
+  // Применяем зум
+  applyZoomToAll();
+  
+  // Восстанавливаем позицию прокрутки
+  requestAnimationFrame(() => {
+    const newScrollTop = scrollRatio * (wrapper.scrollHeight - wrapper.clientHeight);
+    wrapper.scrollTop = newScrollTop;
+  });
+}
+
+// Показать индикатор зума
+function showZoomIndicator() {
+  zoomPercent.textContent = Math.round(zoom * 100) + '%';
   zoomIndicator.classList.add('visible');
-
-  clearTimeout(zoomIndicator._t);
-  zoomIndicator._t = setTimeout(() => {
+  
+  clearTimeout(zoomIndicator.timeout);
+  zoomIndicator.timeout = setTimeout(() => {
     zoomIndicator.classList.remove('visible');
   }, 1500);
 }
 
 /* ======================================================
-   СТРАНИЦЫ
+   НАВИГАЦИЯ
 ====================================================== */
 
+// Получить текущую страницу
 function getCurrentPage() {
-  const items = canvas.querySelectorAll('.comic-page');
-  if (!items.length) return 1;
-
+  const pageContainers = wrapper.querySelectorAll('.page-container');
+  if (pageContainers.length === 0) return 1;
+  
   const wrapperRect = wrapper.getBoundingClientRect();
-  const center = wrapperRect.top + wrapperRect.height / 2;
-
-  let closest = 1;
+  const wrapperCenter = wrapperRect.top + wrapperRect.height / 2;
+  
+  let currentPage = 1;
   let minDistance = Infinity;
-
-  items.forEach((el, i) => {
-    const r = el.getBoundingClientRect();
-    const c = r.top + r.height / 2;
-    const d = Math.abs(c - center);
-
-    if (d < minDistance) {
-      minDistance = d;
-      closest = i + 1;
+  
+  pageContainers.forEach((container, index) => {
+    const rect = container.getBoundingClientRect();
+    const containerCenter = rect.top + rect.height / 2;
+    const distance = Math.abs(containerCenter - wrapperCenter);
+    
+    if (distance < minDistance) {
+      minDistance = distance;
+      currentPage = index + 1;
     }
   });
-
-  return closest;
+  
+  return currentPage;
 }
 
+// Обновить информацию о странице
 function updatePageInfo() {
   const current = getCurrentPage();
   pageInfo.textContent = `${current} / ${pages.length}`;
 }
 
 /* ======================================================
-   SCROLL
+   ОБРАБОТЧИКИ СОБЫТИЙ
 ====================================================== */
 
-wrapper.addEventListener('scroll', () => {
-  const max = wrapper.scrollHeight - wrapper.clientHeight;
-  if (max > 0) {
-    progressBar.style.width = `${(wrapper.scrollTop / max) * 100}%`;
-  }
-  updatePageInfo();
-}, { passive: true });
-
-/* ======================================================
-   КНОПКИ И УПРАВЛЕНИЕ
-====================================================== */
-
-// Кнопки зума
-document.getElementById('zoomIn').onclick = () => applyZoom(ZOOM_STEP);
-document.getElementById('zoomOut').onclick = () => applyZoom(-ZOOM_STEP);
-
-// Навигация
-document.getElementById('toTop').onclick = () => {
-  wrapper.scrollTo({ top: 0, behavior: 'smooth' });
-};
-
-document.getElementById('toBottom').onclick = () => {
-  wrapper.scrollTo({ top: wrapper.scrollHeight, behavior: 'smooth' });
-};
-
-// Тач-контроль для мобильных
-if (isMobile) {
-  let lastTap = 0;
-  let touchStartY = 0;
-  let touchStartScrollTop = 0;
-  let isDragging = false;
+// Настройка обработчиков
+function setupEventListeners() {
+  // Кнопки зума
+  document.getElementById('zoomIn').onclick = () => changeZoom(ZOOM_STEP);
+  document.getElementById('zoomOut').onclick = () => changeZoom(-ZOOM_STEP);
   
+  // Навигация
+  document.getElementById('toTop').onclick = () => {
+    wrapper.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  
+  document.getElementById('toBottom').onclick = () => {
+    wrapper.scrollTo({ top: wrapper.scrollHeight, behavior: 'smooth' });
+  };
+  
+  // Плавный скролл с оптимизацией
+  let scrollTimeout;
+  wrapper.addEventListener('scroll', () => {
+    // Прогресс-бар
+    const scrollHeight = wrapper.scrollHeight - wrapper.clientHeight;
+    if (scrollHeight > 0) {
+      const progress = (wrapper.scrollTop / scrollHeight) * 100;
+      progressBar.style.width = progress + '%';
+    }
+    
+    // Обновление страницы с дебаунсом
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(updatePageInfo, 100);
+  }, { passive: true });
+  
+  // Ресайз окна
+  let resizeTimeout;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      applyZoomToAll();
+      updatePageInfo();
+    }, 250);
+  });
+  
+  // Тач-события для мобильных
+  if (isMobile) {
+    setupTouchEvents();
+  }
+  
+  // Клавиатура для десктопа
+  if (!isMobile) {
+    document.addEventListener('keydown', handleKeydown);
+  }
+}
+
+// Настройка тач-событий
+function setupTouchEvents() {
   // Двойной тап для зума
-  canvas.addEventListener('touchend', (e) => {
+  let lastTapTime = 0;
+  let tapCount = 0;
+  
+  wrapper.addEventListener('touchend', (e) => {
     const currentTime = new Date().getTime();
-    const tapLength = currentTime - lastTap;
+    const tapLength = currentTime - lastTapTime;
     
     if (tapLength < 300 && tapLength > 0) {
-      e.preventDefault();
-      // Переключаем между 100% и 150%
-      if (Math.abs(zoom - 1.0) < 0.1) {
-        zoom = 1.5;
-      } else {
-        zoom = 1.0;
-      }
-      applyImageSizing();
+      tapCount++;
       
-      // Показываем индикатор
-      zoomPercent.textContent = `${Math.round(zoom * 100)}%`;
-      zoomIndicator.classList.add('visible');
-      clearTimeout(zoomIndicator._t);
-      zoomIndicator._t = setTimeout(() => {
-        zoomIndicator.classList.remove('visible');
-      }, 1500);
+      if (tapCount === 2) {
+        e.preventDefault();
+        // Переключаем между 100% и 150%
+        if (Math.abs(zoom - 1.0) < 0.1) {
+          zoom = 1.5;
+        } else {
+          zoom = 1.0;
+        }
+        applyZoomToAll();
+        tapCount = 0;
+      }
+    } else {
+      tapCount = 1;
     }
     
-    lastTap = currentTime;
-  });
-  
-  // Свайп для навигации
-  wrapper.addEventListener('touchstart', (e) => {
-    if (e.touches.length === 1) {
-      touchStartY = e.touches[0].clientY;
-      touchStartScrollTop = wrapper.scrollTop;
-      isDragging = true;
-    }
-  }, { passive: true });
-  
-  wrapper.addEventListener('touchmove', (e) => {
-    if (!isDragging || e.touches.length !== 1) return;
-    const touchY = e.touches[0].clientY;
-    const deltaY = touchStartY - touchY;
-    wrapper.scrollTop = touchStartScrollTop + deltaY * 1.5;
-  }, { passive: true });
-  
-  wrapper.addEventListener('touchend', () => {
-    isDragging = false;
-  });
+    lastTapTime = currentTime;
+  }, { passive: false });
 }
 
-/* ======================================================
-   ИНИЦИАЛИЗАЦИЯ И АДАПТАЦИЯ
-====================================================== */
-
-// Устанавливаем правильную высоту для мобильных
-function setFullHeight() {
-  if (isIOS) {
-    document.documentElement.style.height = '-webkit-fill-available';
-    document.getElementById('reader').style.height = '-webkit-fill-available';
-  } else if (isAndroid) {
-    document.getElementById('reader').style.height = '100dvh';
-  } else {
-    document.getElementById('reader').style.height = '100vh';
+// Обработка клавиатуры
+function handleKeydown(e) {
+  // Зум с Ctrl/Cmd
+  if (e.ctrlKey || e.metaKey) {
+    if (e.key === '+' || e.key === '=') {
+      e.preventDefault();
+      changeZoom(ZOOM_STEP);
+      return;
+    }
+    if (e.key === '-') {
+      e.preventDefault();
+      changeZoom(-ZOOM_STEP);
+      return;
+    }
+    if (e.key === '0') {
+      e.preventDefault();
+      zoom = 1.0;
+      applyZoomToAll();
+      return;
+    }
+  }
+  
+  // Навигация
+  switch(e.key) {
+    case 'ArrowDown':
+    case 'PageDown':
+    case ' ':
+      e.preventDefault();
+      wrapper.scrollBy({ top: wrapper.clientHeight * 0.8, behavior: 'smooth' });
+      break;
+    case 'ArrowUp':
+    case 'PageUp':
+      e.preventDefault();
+      wrapper.scrollBy({ top: -wrapper.clientHeight * 0.8, behavior: 'smooth' });
+      break;
+    case 'Home':
+      e.preventDefault();
+      wrapper.scrollTo({ top: 0, behavior: 'smooth' });
+      break;
+    case 'End':
+      e.preventDefault();
+      wrapper.scrollTo({ top: wrapper.scrollHeight, behavior: 'smooth' });
+      break;
   }
 }
 
-// Обработчик ресайза
-let resizeTimeout;
-window.addEventListener('resize', () => {
-  clearTimeout(resizeTimeout);
-  resizeTimeout = setTimeout(() => {
-    applyImageSizing();
-    updatePageInfo();
-  }, 250);
-});
+/* ======================================================
+   ИНИЦИАЛИЗАЦИЯ
+====================================================== */
 
-// Инициализация
 document.addEventListener('DOMContentLoaded', () => {
-  setFullHeight();
+  // Фикс для мобильных браузеров
+  if (isIOS) {
+    document.documentElement.style.height = '-webkit-fill-available';
+    const reader = document.getElementById('reader');
+    reader.style.height = '-webkit-fill-available';
+  }
   
   // Блокируем скролл страницы
   document.documentElement.style.overflow = 'hidden';
   document.body.style.overflow = 'hidden';
   
-  // Фикс для Safari
-  if (isIOS) {
-    document.body.style.webkitUserSelect = 'none';
-    document.body.style.webkitTouchCallout = 'none';
-  }
+  // Загружаем комикс и настраиваем события
+  loadComic().then(() => {
+    setupEventListeners();
+    
+    // Принудительно показываем кнопки
+    const controls = document.querySelector('.controls');
+    const progress = document.querySelector('.progress');
+    if (controls) controls.style.opacity = '1';
+    if (progress) progress.style.opacity = '1';
+  });
   
-  // Принудительно показываем кнопки
-  controls.style.opacity = '1';
-  controls.style.visibility = 'visible';
-  document.querySelector('.progress').style.opacity = '1';
-  
-  // Загружаем комикс
-  loadComic();
+  // Ресайз при повороте
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => {
+      applyZoomToAll();
+    }, 300);
+  });
 });
 
-// Перерисовка при изменении ориентации
-window.addEventListener('orientationchange', () => {
-  setTimeout(() => {
-    setFullHeight();
-    applyImageSizing();
-  }, 300);
-});
-
-// После полной загрузки страницы
+// Фикс после полной загрузки
 window.addEventListener('load', () => {
   setTimeout(() => {
-    applyImageSizing();
+    applyZoomToAll();
   }, 100);
 });
 </script>
