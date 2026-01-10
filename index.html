@@ -72,14 +72,15 @@ const zoomPercent = document.getElementById('zoomPercent');
    ВСПОМОГАТЕЛЬНЫЕ
 ====================================================== */
 
-function imageExists(url) {
-  return new Promise(resolve => {
-    const img = new Image();
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(false);
-    img.src = url + '?v=' + Math.random();
-  });
+async function imageExists(url) {
+  try {
+    const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
+
 
 /* ======================================================
    АВТОПОИСК СТРАНИЦ
