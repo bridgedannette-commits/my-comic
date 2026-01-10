@@ -120,8 +120,11 @@ canvas:active {
 }
 
 /* Навигационная панель - ИСПРАВЛЕННЫЙ БЛЮР */
+/* Навигационная панель - БЛЮР БЕЗ АРТЕФАКТОВ */
 .controls {
-  background: rgba(25, 25, 25, 0.98); /* Более непрозрачный фон */
+  background: rgba(25, 25, 25, 0.85);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
   display: flex;
   justify-content: center;
   gap: 15px;
@@ -130,13 +133,19 @@ canvas:active {
   width: 100%;
   pointer-events: auto;
   min-height: 70px;
-  /* Убираем backdrop-filter, чтобы избежать артефактов */
   border-top: 1px solid rgba(255, 165, 0, 0.1);
   position: relative;
   z-index: 101;
+  /* Фикс для артефактов блюра */
+  -webkit-backface-visibility: hidden;
+  -moz-backface-visibility: hidden;
+  -webkit-transform: translate3d(0, 0, 0);
+  -moz-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
+  isolation: isolate;
 }
 
-/* Фикс для артефактов блюра - псевдоэлемент */
+/* Создаем отдельный слой для блюра чтобы избежать артефактов */
 .controls::before {
   content: '';
   position: absolute;
@@ -144,8 +153,17 @@ canvas:active {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(25, 25, 25, 0.98);
+  background: rgba(25, 25, 25, 0.6); /* Более прозрачный фон для блюра */
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
   z-index: -1;
+  border-radius: 0; /* Убираем скругления чтобы не было артефактов */
+}
+
+/* Контейнер для содержимого панели */
+.controls > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* Кнопки навигации в начало/конец */
