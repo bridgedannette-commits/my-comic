@@ -1,5 +1,4 @@
-/* css/styles.css */
-/* Сброс стилей WordPress */
+
 #reader * {
   box-sizing: border-box;
   margin: 0;
@@ -34,7 +33,6 @@ html, body {
   isolation: isolate;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
-
 
 /* Контейнер для canvas */
 .canvas-wrapper {
@@ -80,12 +78,11 @@ canvas:active {
 /* Обертка для навигационной панели */
 .controls-wrapper {
   position: absolute;
+  bottom: 0;
   left: 0;
   width: 100%;
   z-index: 100;
   pointer-events: none;
-
-  bottom: env(safe-area-inset-bottom);
 }
 
 /* Индикатор масштаба */
@@ -130,7 +127,7 @@ canvas:active {
   justify-content: center;
   gap: 15px;
   align-items: center;
-  padding-bottom: calc(15px + env(safe-area-inset-bottom));
+  padding: 15px 0;
   width: 100%;
   pointer-events: auto;
   min-height: 70px;
@@ -266,7 +263,7 @@ button:active {
 /* Прогресс-бар над навигационной панелью */
 .progress {
   position: absolute;
-  bottom: calc(70px + env(safe-area-inset-bottom));
+  bottom: 70px;
   left: 0;
   width: 100%;
   height: 6px;
@@ -277,7 +274,6 @@ button:active {
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
-
 
 .progress-bar {
   height: 100%;
@@ -337,9 +333,8 @@ button:active {
   }
   
   .progress {
-    bottom: calc(60px + env(safe-area-inset-bottom));
+    bottom: 60px;
     height: 5px;
-    
   }
 }
 
@@ -377,19 +372,11 @@ button:active {
   }
   
   .progress {
-    bottom: calc(55px + env(safe-area-inset-bottom));
+    bottom: 55px;
     height: 4px;
   }
 }
 
 .comic-canvas {
-  transform-origin: 50% 0%;
-  width: 100%;
-  max-width: 100vw;
-}
-
-.comic-page img {
-  max-width: 100%;
-  height: auto;
-  display: block;
+  transform-origin: top center;
 }
