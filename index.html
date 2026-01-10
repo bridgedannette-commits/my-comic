@@ -35,7 +35,7 @@
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-const PDF_URL = "https://bridgedannette-commits.github.io/my-comic/comics/mycomic.pdf";
+const PDF_URL = "https://bridgedannette-commits.github.io/my-comic/mycomic.pdf";
 
 let pdfDoc = null;
 let zoom = 1.0;
@@ -45,6 +45,8 @@ const ZOOM_STEP = 0.2;
 
 let currentRenderId = 0;
 let zoomIndicatorTimeout = null;
+let isRendering = false;
+let renderQueue = [];
 
 const wrapper = document.getElementById("canvasWrapper");
 const pageInfo = document.getElementById("pageInfo");
@@ -96,13 +98,16 @@ function getTargetWidth() {
     return Math.min(600, window.innerWidth * 0.9);
 }
 
-// Рендерим одну страницу
+// Рендерим одну страницу с защитой от повторного рендеринга
 async function renderPage(pageNum, renderId) {
   if (!pdfDoc || renderId !== currentRenderId) return;
   
   const page = await pdfDoc.getPage(pageNum);
   const canvas = canvases[pageNum - 1];
   const ctx = canvas.getContext("2d");
+  
+  // Очищаем canvas перед рендерингом
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   
   const viewport = page.getViewport({ scale: 1 });
   const targetWidth = getTargetWidth();
@@ -115,46 +120,49 @@ async function renderPage(pageNum, renderId) {
   canvas.height = scaledViewport.height;
   canvas.style.width = `${scaledViewport.width}px`;
   canvas.style.height = `${scaledViewport.height}px`;
-  
-  // УБРАТЬ margin: auto для теста
-  canvas.style.margin = '0';
+  canvas.style.margin = '0 auto';
   
   const renderContext = {
     canvasContext: ctx,
     viewport: scaledViewport
   };
   
-  await page.render(renderContext).promise;
-  
-  // Если это первая страница, принудительно исправить стили
-  if (pageNum === 1) {
-    canvas.style.transform = 'none';
-    canvas.style.webkitTransform = 'none';
-    canvas.style.mozTransform = 'none';
-    canvas.style.msTransform = 'none';
-    canvas.style.oTransform = 'none';
+  try {
+    await page.render(renderContext).promise;
+  } catch (error) {
+    console.warn(`Ошибка рендеринга страницы ${pageNum}:`, error);
+    // Игнорируем ошибки рендеринга, они обычно вызваны прерыванием
   }
 }
 
-// Рендерим все страницы
+// Рендерим все страницы с очередью
 async function renderAllPages() {
   currentRenderId++;
-  
   const renderId = currentRenderId;
-  const promises = [];
   
-  for (let i = 1; i <= pdfDoc.numPages; i++) {
-    promises.push(new Promise(resolve => {
-      setTimeout(async () => {
-        if (renderId === currentRenderId) {
-          await renderPage(i, renderId);
-        }
-        resolve();
-      }, i * 10);
-    }));
+  // Если уже идет рендеринг, отменяем его
+  if (isRendering) {
+    console.log('Прерываем предыдущий рендеринг');
   }
   
-  await Promise.all(promises);
+  isRendering = true;
+  
+  try {
+    // Рендерим страницы последовательно, а не параллельно
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+      if (renderId !== currentRenderId) {
+        console.log('Рендеринг прерван новым запросом');
+        break; // Прерываем если запущен новый рендеринг
+      }
+      
+      await renderPage(i, renderId);
+      
+      // Небольшая задержка между страницами для стабильности
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+  } finally {
+    isRendering = false;
+  }
 }
 
 // Показываем индикатор зума
@@ -171,7 +179,8 @@ function showZoomIndicator() {
   }, 1500);
 }
 
-// Применяем зум
+// Применяем зум с защитой от частых вызовов
+let zoomTimeout;
 async function applyZoom(delta) {
   const newZoom = zoom + delta;
   
@@ -184,7 +193,15 @@ async function applyZoom(delta) {
   // Показываем индикатор зума
   showZoomIndicator();
   
-  await renderAllPages();
+  // Отменяем предыдущий запрос на зум
+  if (zoomTimeout) {
+    clearTimeout(zoomTimeout);
+  }
+  
+  // Запускаем рендеринг с задержкой для дебаунса
+  zoomTimeout = setTimeout(async () => {
+    await renderAllPages();
+  }, 100);
 }
 
 // Обновляем информацию о странице
