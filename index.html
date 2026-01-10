@@ -11,121 +11,98 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  /* Исправление для controls-wrapper */
-  .controls-wrapper {
-    pointer-events: auto !important; /* ВАЖНО: исправляем проблему с кнопками */
-  }
-  
-  /* Исправление для страниц */
-  .page-container {
-    display: flex;
-    justify-content: center;
-    margin: 0 auto;
-    padding: 0;
-    width: 100%;
-  }
-  
-  .page-container img {
-    display: block;
-    width: auto;
-    height: auto;
-    max-width: 100%;
-    image-rendering: -webkit-optimize-contrast;
-    image-rendering: crisp-edges;
-    margin: 0;
-    padding: 0;
-  }
-  
-  /* Гарантируем видимость на мобильных */
-  @media (max-width: 768px) {
-    .controls {
-      opacity: 1 !important;
-      visibility: visible !important;
-      display: flex !important;
-    }
-    
-    .controls-wrapper {
-      position: fixed !important; /* Фиксируем на мобильных */
-      bottom: env(safe-area-inset-bottom, 0px) !important;
-      z-index: 10000 !important; /* Повышаем z-index */
-    }
-    
-    .progress {
-      position: fixed !important;
-      bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
-      z-index: 10000 !important;
-    }
-    
-    .zoom-indicator {
-      position: fixed !important;
-      bottom: calc(100px + env(safe-area-inset-bottom, 0px)) !important;
-      z-index: 10000 !important;
-    }
-  }
+
 </style>
 </head>
 
 <body>
 
 <div class="comic-reader" id="reader">
-  <div class="canvas-wrapper" id="canvasWrapper">
-    <!-- Страницы будут добавляться сюда -->
-  </div>
-
-  <div class="zoom-indicator" id="zoomIndicator">
-    <span id="zoomPercent">100%</span>
-  </div>
-
-  <div class="controls-wrapper" id="controlsWrapper">
-    <div class="controls" id="controls">
-      <button id="toTop" title="В начало" class="nav-btn">▲</button>
-      <button id="zoomOut" title="Уменьшить" class="zoom-btn">−</button>
-      <span id="pageInfo">– / –</span>
-      <button id="zoomIn" title="Увеличить" class="zoom-btn">+</button>
-      <button id="toBottom" title="В конец" class="nav-btn">▼</button>
+  <!-- Верхняя панель -->
+  <div class="header-wrapper" id="headerWrapper">
+    <div class="header">
+      <button class="header-btn" id="menuBtn">☰</button>
+      <div class="comic-title" id="comicTitle">Мой Комикс</div>
+      <button class="header-btn" id="settingsBtn">⚙</button>
     </div>
   </div>
 
+  <div class="canvas-wrapper" id="canvasWrapper"></div>
+
+  <!-- Нижняя панель -->
+  <div class="controls-wrapper" id="controlsWrapper">
+    <div class="controls">
+      <button id="toTop" class="nav-btn">▲</button>
+      <span id="pageInfo">– / –</span>
+      <button id="toBottom" class="nav-btn">▼</button>
+    </div>
+  </div>
+
+  <!-- Прогресс-бар -->
   <div class="progress">
     <div class="progress-bar" id="progressBar"></div>
   </div>
 </div>
 
 <script>
-/* ======================================================
-   КОНФИГУРАЦИЯ
-====================================================== */
+/* ================= КОНФИГ ================= */
 const COMIC_PATH = 'https://bridgedannette-commits.github.io/my-comic/comics/test/';
 const IMAGE_EXTS = ['webp', 'png', 'jpg', 'jpeg'];
 const MAX_PAGES_SAFE = 500;
-
-const MIN_ZOOM = 0.5;
-const MAX_ZOOM = 3.0;
-const ZOOM_STEP = 0.2;
-
 const isMobile = window.innerWidth <= 768;
-const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+const COMIC_TITLE = 'Мой Комикс'; // Название комикса
 
-/* ======================================================
-   СОСТОЯНИЕ
-====================================================== */
-let zoom = 1.0;
+/* ================= СОСТОЯНИЕ ================= */
 let pages = [];
-let images = [];
-let baseWidth = 600;
-let isZooming = false;
-
 const wrapper = document.getElementById('canvasWrapper');
 const pageInfo = document.getElementById('pageInfo');
 const progressBar = document.getElementById('progressBar');
-const zoomIndicator = document.getElementById('zoomIndicator');
-const zoomPercent = document.getElementById('zoomPercent');
+const headerWrapper = document.getElementById('headerWrapper');
 const controlsWrapper = document.getElementById('controlsWrapper');
+const comicTitle = document.getElementById('comicTitle');
+const reader = document.getElementById('reader');
 
-/* ======================================================
-   ОСНОВНЫЕ ФУНКЦИИ
-====================================================== */
+// Таймеры для скрытия панелей
+let hidePanelsTimeout;
+let panelsVisible = true;
+const HIDE_PANELS_DELAY = 3000; // 3 секунды до скрытия
 
+/* ================= ФУНКЦИИ ДЛЯ ПАНЕЛЕЙ ================= */
+function showPanels() {
+  if (!panelsVisible) {
+    headerWrapper.classList.remove('hidden');
+    controlsWrapper.classList.remove('hidden');
+    reader.classList.remove('panels-hidden');
+    reader.classList.add('panels-visible');
+    panelsVisible = true;
+  }
+  resetHidePanelsTimer();
+}
+
+function hidePanels() {
+  if (panelsVisible) {
+    headerWrapper.classList.add('hidden');
+    controlsWrapper.classList.add('hidden');
+    reader.classList.remove('panels-visible');
+    reader.classList.add('panels-hidden');
+    panelsVisible = false;
+  }
+}
+
+function resetHidePanelsTimer() {
+  clearTimeout(hidePanelsTimeout);
+  hidePanelsTimeout = setTimeout(hidePanels, HIDE_PANELS_DELAY);
+}
+
+function togglePanels() {
+  if (panelsVisible) {
+    hidePanels();
+  } else {
+    showPanels();
+  }
+}
+
+/* ================= ЗАГРУЗКА ================= */
 async function imageExists(url) {
   try {
     const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
@@ -145,7 +122,7 @@ async function detectPages() {
     for (const ext of IMAGE_EXTS) {
       const url = `${COMIC_PATH}${pageNum}.${ext}`;
       if (await imageExists(url)) {
-        result.push({ url, num: pageNum, ext });
+        result.push({ url, num: pageNum });
         found = true;
         break;
       }
@@ -159,23 +136,22 @@ async function detectPages() {
 }
 
 async function loadComic() {
-  wrapper.innerHTML = '<div style="color:#ccc;text-align:center;padding:50px;font-family:Inter,sans-serif;">Загрузка...</div>';
+  wrapper.innerHTML = '<div style="color:#ccc;text-align:center;padding:50px;">Загрузка...</div>';
   
   pages = await detectPages();
   
   if (pages.length === 0) {
-    wrapper.innerHTML = '<div style="color:#fff;text-align:center;padding:50px;font-family:Inter,sans-serif;">Комикс не найден</div>';
+    wrapper.innerHTML = '<div style="color:#fff;text-align:center;padding:50px;">Комикс не найден</div>';
     return;
   }
   
   wrapper.innerHTML = '';
-  images = new Array(pages.length);
   
-  // Создаем контейнеры для всех страниц
   pages.forEach((page, index) => {
-    const pageDiv = document.createElement('div');
-    pageDiv.className = 'page-container';
-    pageDiv.id = `page-${page.num}`;
+    const container = document.createElement('div');
+    container.className = 'page-container';
+    container.dataset.page = page.num;
+    container.style.margin = '0 auto';
     
     const img = document.createElement('img');
     img.loading = 'lazy';
@@ -183,137 +159,56 @@ async function loadComic() {
     img.alt = `Страница ${page.num}`;
     img.style.display = 'block';
     img.style.margin = '0 auto';
-    img.style.padding = '0';
+    img.style.maxWidth = '100%';
+    img.style.height = 'auto';
     
-    if (index < 3) {
+    // Автоматический размер
+    img.onload = function() {
+      const maxWidth = isMobile ? 
+        Math.min(800, window.innerWidth - 20) : 
+        Math.min(1000, window.innerWidth * 0.95);
+      
+      if (this.naturalWidth > maxWidth) {
+        const scale = maxWidth / this.naturalWidth;
+        this.style.width = maxWidth + 'px';
+        this.style.height = (this.naturalHeight * scale) + 'px';
+        container.style.width = maxWidth + 'px';
+      } else {
+        this.style.width = this.naturalWidth + 'px';
+        container.style.width = this.naturalWidth + 'px';
+      }
+    };
+    
+    if (index < 5) {
       img.src = page.url;
     } else {
       img.dataset.src = page.url;
     }
     
-    img.onload = function() {
-      images[index] = this;
-      applyZoomToImage(this);
-    };
-    
-    pageDiv.appendChild(img);
-    wrapper.appendChild(pageDiv);
+    container.appendChild(img);
+    wrapper.appendChild(container);
   });
+  
+  // Устанавливаем название комикса
+  comicTitle.textContent = COMIC_TITLE;
+  
+  // Инициализируем состояние панелей
+  reader.classList.add('panels-visible');
   
   updatePageInfo();
-  calculateBaseWidth();
-  applyZoomToAll();
   
-  // Принудительно показываем кнопки на мобильных
-  if (isMobile && controlsWrapper) {
-    controlsWrapper.style.opacity = '1';
-    controlsWrapper.style.visibility = 'visible';
-    controlsWrapper.style.pointerEvents = 'auto';
-    controlsWrapper.style.display = 'block';
-  }
-  
-  setTimeout(() => loadRemainingImages(), 100);
+  setTimeout(() => {
+    wrapper.querySelectorAll('img[data-src]').forEach(img => {
+      img.src = img.dataset.src;
+      delete img.dataset.src;
+    });
+  }, 100);
 }
 
-function loadRemainingImages() {
-  const imgs = wrapper.querySelectorAll('img[data-src]');
-  imgs.forEach(img => {
-    img.src = img.dataset.src;
-    delete img.dataset.src;
-  });
-}
-
-function calculateBaseWidth() {
-  if (isMobile) {
-    baseWidth = Math.min(800, window.innerWidth - 40);
-  } else {
-    baseWidth = Math.min(1000, window.innerWidth * 0.9);
-  }
-}
-
-/* ======================================================
-   ИСПРАВЛЕННЫЙ ЗУМ (БЕЗ ПРОКРУТКИ)
-====================================================== */
-
-function applyZoomToImage(img) {
-  if (!img.naturalWidth) return;
-  
-  const naturalWidth = img.naturalWidth;
-  const naturalHeight = img.naturalHeight;
-  const displayWidth = Math.floor(baseWidth * zoom);
-  const scale = displayWidth / naturalWidth;
-  const displayHeight = Math.floor(naturalHeight * scale);
-  
-  img.style.width = displayWidth + 'px';
-  img.style.height = displayHeight + 'px';
-  img.style.maxWidth = '100%';
-  
-  const container = img.parentElement;
-  if (container) {
-    container.style.width = displayWidth + 'px';
-    container.style.height = displayHeight + 'px';
-  }
-}
-
-function applyZoomToAll() {
-  if (isZooming) return;
-  isZooming = true;
-  
-  calculateBaseWidth();
-  
-  // Сохраняем позицию прокрутки ДО изменения размеров
-  const scrollTop = wrapper.scrollTop;
-  const scrollHeight = wrapper.scrollHeight;
-  
-  // Применяем зум ко всем изображениям
-  images.forEach(img => {
-    if (img && img.naturalWidth) {
-      applyZoomToImage(img);
-    }
-  });
-  
-  // Восстанавливаем позицию прокрутки ПОСЛЕ изменения размеров
-  requestAnimationFrame(() => {
-    const newScrollHeight = wrapper.scrollHeight;
-    if (scrollHeight > 0 && newScrollHeight > 0) {
-      // Сохраняем пропорциональную позицию
-      const scrollRatio = scrollTop / scrollHeight;
-      wrapper.scrollTop = newScrollHeight * scrollRatio;
-    }
-    isZooming = false;
-  });
-  
-  showZoomIndicator();
-}
-
-function changeZoom(delta) {
-  const newZoom = zoom + delta;
-  
-  if (newZoom < MIN_ZOOM || newZoom > MAX_ZOOM) {
-    return;
-  }
-  
-  zoom = Math.round(newZoom * 100) / 100;
-  applyZoomToAll();
-}
-
-function showZoomIndicator() {
-  zoomPercent.textContent = Math.round(zoom * 100) + '%';
-  zoomIndicator.classList.add('visible');
-  
-  clearTimeout(zoomIndicator.timeout);
-  zoomIndicator.timeout = setTimeout(() => {
-    zoomIndicator.classList.remove('visible');
-  }, 1500);
-}
-
-/* ======================================================
-   НАВИГАЦИЯ
-====================================================== */
-
+/* ================= НАВИГАЦИЯ ================= */
 function getCurrentPage() {
-  const pageContainers = wrapper.querySelectorAll('.page-container');
-  if (pageContainers.length === 0) return 1;
+  const containers = wrapper.querySelectorAll('.page-container');
+  if (containers.length === 0) return 1;
   
   const wrapperRect = wrapper.getBoundingClientRect();
   const wrapperCenter = wrapperRect.top + wrapperRect.height / 2;
@@ -321,14 +216,14 @@ function getCurrentPage() {
   let currentPage = 1;
   let minDistance = Infinity;
   
-  pageContainers.forEach((container, index) => {
+  containers.forEach(container => {
     const rect = container.getBoundingClientRect();
     const containerCenter = rect.top + rect.height / 2;
     const distance = Math.abs(containerCenter - wrapperCenter);
     
     if (distance < minDistance) {
       minDistance = distance;
-      currentPage = index + 1;
+      currentPage = parseInt(container.dataset.page) || 1;
     }
   });
   
@@ -340,122 +235,137 @@ function updatePageInfo() {
   pageInfo.textContent = `${current} / ${pages.length}`;
 }
 
-/* ======================================================
-   ОБРАБОТЧИКИ СОБЫТИЙ
-====================================================== */
-
-function setupEventListeners() {
-  // Кнопки зума
-  document.getElementById('zoomIn').onclick = () => changeZoom(ZOOM_STEP);
-  document.getElementById('zoomOut').onclick = () => changeZoom(-ZOOM_STEP);
-  
-  // Навигация
-  document.getElementById('toTop').onclick = () => {
-    wrapper.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-  
-  document.getElementById('toBottom').onclick = () => {
-    wrapper.scrollTo({ top: wrapper.scrollHeight, behavior: 'smooth' });
-  };
-  
-  // Плавный скролл
-  let scrollTimeout;
-  wrapper.addEventListener('scroll', () => {
-    const scrollHeight = wrapper.scrollHeight - wrapper.clientHeight;
-    if (scrollHeight > 0) {
-      const progress = (wrapper.scrollTop / scrollHeight) * 100;
-      progressBar.style.width = progress + '%';
-    }
-    
-    clearTimeout(scrollTimeout);
-    scrollTimeout = setTimeout(updatePageInfo, 50);
-  }, { passive: true });
-  
-  // Ресайз окна
-  let resizeTimeout;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimeout);
-    resizeTimeout = setTimeout(() => {
-      calculateBaseWidth();
-      applyZoomToAll();
-      updatePageInfo();
-    }, 250);
-  });
-  
-  // Тач-события для мобильных
-  if (isMobile) {
-    setupTouchEvents();
+function updateScrollInfo() {
+  const scrollHeight = wrapper.scrollHeight - wrapper.clientHeight;
+  if (scrollHeight > 0) {
+    const progress = (wrapper.scrollTop / scrollHeight) * 100;
+    progressBar.style.width = progress + '%';
   }
-  
-  // Клавиатура для десктопа
-  if (!isMobile) {
-    document.addEventListener('keydown', handleKeydown);
-  }
+  updatePageInfo();
 }
 
-function setupTouchEvents() {
-  let lastTapTime = 0;
-  let lastTapX = 0;
-  let lastTapY = 0;
+/* ================= СОБЫТИЯ ================= */
+document.getElementById('toTop').onclick = () => {
+  wrapper.scrollTo({ top: 0, behavior: 'smooth' });
+  showPanels();
+};
+
+document.getElementById('toBottom').onclick = () => {
+  wrapper.scrollTo({ top: wrapper.scrollHeight, behavior: 'smooth' });
+  showPanels();
+};
+
+// Клик по кнопкам меню (пока заглушки)
+document.getElementById('menuBtn').onclick = (e) => {
+  e.stopPropagation();
+  showPanels();
+  // В будущем можно добавить функционал меню
+  alert('Меню (функционал в разработке)');
+};
+
+document.getElementById('settingsBtn').onclick = (e) => {
+  e.stopPropagation();
+  showPanels();
+  // В будущем можно добавить настройки
+  alert('Настройки (функционал в разработке)');
+};
+
+// Клик по области комикса показывает/скрывает панели
+wrapper.addEventListener('click', (e) => {
+  // Не реагируем на клики по кнопкам и другим интерактивным элементам
+  if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+    return;
+  }
   
-  // Двойной тап для зума
-  wrapper.addEventListener('touchend', (e) => {
-    const currentTime = Date.now();
-    const touch = e.changedTouches[0];
+  // Не реагируем на клики по прогресс-бару
+  if (e.target.closest('.progress')) {
+    return;
+  }
+  
+  togglePanels();
+});
+
+// Тап на мобильных устройствах (для touch устройств)
+wrapper.addEventListener('touchstart', (e) => {
+  // Сохраняем начальную точку тапа
+  e.tapStartX = e.touches[0].clientX;
+  e.tapStartY = e.touches[0].clientY;
+  e.isTap = true;
+}, { passive: true });
+
+wrapper.addEventListener('touchmove', (e) => {
+  // Если палец сдвинулся больше чем на 10px - это не тап, а свайп
+  const touch = e.touches[0];
+  const diffX = Math.abs(touch.clientX - e.tapStartX);
+  const diffY = Math.abs(touch.clientY - e.tapStartY);
+  
+  if (diffX > 10 || diffY > 10) {
+    e.isTap = false;
+  }
+}, { passive: true });
+
+wrapper.addEventListener('touchend', (e) => {
+  // Если это был тап (не свайп) - показываем/скрываем панели
+  if (e.isTap) {
+    // Не реагируем на тапы по кнопкам
+    const target = e.target;
+    if (target.tagName === 'BUTTON' || target.closest('button')) {
+      return;
+    }
     
-    if (currentTime - lastTapTime < 300 &&
-        Math.abs(touch.clientX - lastTapX) < 50 &&
-        Math.abs(touch.clientY - lastTapY) < 50) {
-      e.preventDefault();
-      
-      // Переключаем между 100% и 150%
-      if (Math.abs(zoom - 1.0) < 0.1) {
-        changeZoom(0.5);
-      } else {
-        changeZoom(-0.5);
+    // Не реагируем на тапы по прогресс-бару
+    if (target.closest('.progress')) {
+      return;
+    }
+    
+    togglePanels();
+    e.preventDefault();
+  }
+}, { passive: false });
+
+// При скролле колесиком мыши - НЕ показываем панели, только обновляем прогресс
+let scrollTimeout;
+wrapper.addEventListener('scroll', () => {
+  const scrollHeight = wrapper.scrollHeight - wrapper.clientHeight;
+  if (scrollHeight > 0) {
+    const progress = (wrapper.scrollTop / scrollHeight) * 100;
+    progressBar.style.width = progress + '%';
+  }
+  
+  clearTimeout(scrollTimeout);
+  scrollTimeout = setTimeout(updatePageInfo, 50);
+}, { passive: true });
+
+// Ресайз окна
+let resizeTimeout;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(() => {
+    const maxWidth = isMobile ? 
+      Math.min(800, window.innerWidth - 20) : 
+      Math.min(1000, window.innerWidth * 0.95);
+    
+    wrapper.querySelectorAll('img').forEach(img => {
+      if (img.naturalWidth) {
+        if (img.naturalWidth > maxWidth) {
+          const scale = maxWidth / img.naturalWidth;
+          img.style.width = maxWidth + 'px';
+          img.style.height = (img.naturalHeight * scale) + 'px';
+          
+          const container = img.parentElement;
+          if (container) {
+            container.style.width = maxWidth + 'px';
+          }
+        }
       }
-    }
+    });
     
-    lastTapTime = currentTime;
-    lastTapX = touch.clientX;
-    lastTapY = touch.clientY;
-  }, { passive: false });
-  
-  // Скрываем кнопки при скролле, показываем при остановке
-  let hideTimeout;
-  wrapper.addEventListener('scroll', () => {
-    if (controlsWrapper) {
-      controlsWrapper.style.opacity = '0.5';
-      controlsWrapper.style.transition = 'opacity 0.2s';
-      
-      clearTimeout(hideTimeout);
-      hideTimeout = setTimeout(() => {
-        controlsWrapper.style.opacity = '1';
-      }, 300);
-    }
-  }, { passive: true });
-}
+    updatePageInfo();
+  }, 250);
+});
 
-function handleKeydown(e) {
-  if (e.ctrlKey || e.metaKey) {
-    if (e.key === '+' || e.key === '=') {
-      e.preventDefault();
-      changeZoom(ZOOM_STEP);
-      return;
-    }
-    if (e.key === '-') {
-      e.preventDefault();
-      changeZoom(-ZOOM_STEP);
-      return;
-    }
-    if (e.key === '0') {
-      e.preventDefault();
-      zoom = 1.0;
-      applyZoomToAll();
-      return;
-    }
-  }
-  
+// Клавиатура
+document.addEventListener('keydown', (e) => {
   switch(e.key) {
     case 'ArrowDown':
     case 'PageDown':
@@ -476,58 +386,38 @@ function handleKeydown(e) {
       e.preventDefault();
       wrapper.scrollTo({ top: wrapper.scrollHeight, behavior: 'smooth' });
       break;
+    case 'f':
+    case 'F':
+      // Клавиша F для переключения видимости панелей
+      e.preventDefault();
+      togglePanels();
+      break;
   }
-}
+});
 
-/* ======================================================
-   ИНИЦИАЛИЗАЦИЯ
-====================================================== */
+// При бездействии скрываем панели
+resetHidePanelsTimer();
 
+/* ================= ЗАПУСК ================= */
 document.addEventListener('DOMContentLoaded', () => {
-  // Фикс для мобильных браузеров
-  if (isIOS) {
+  // Фикс для мобильных
+  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
     document.documentElement.style.height = '-webkit-fill-available';
-    const reader = document.getElementById('reader');
-    reader.style.height = '-webkit-fill-available';
-    
-    // Фикс для безопасных зон
-    document.documentElement.style.paddingBottom = 'env(safe-area-inset-bottom)';
-    reader.style.paddingBottom = 'env(safe-area-inset-bottom)';
+    document.getElementById('reader').style.height = '-webkit-fill-available';
   }
   
   // Блокируем скролл страницы
   document.documentElement.style.overflow = 'hidden';
   document.body.style.overflow = 'hidden';
   
-  // Принудительно показываем кнопки
-  if (controlsWrapper) {
-    controlsWrapper.style.opacity = '1';
-    controlsWrapper.style.visibility = 'visible';
-    controlsWrapper.style.pointerEvents = 'auto';
-  }
-  
   // Загружаем комикс
-  loadComic().then(() => {
-    setupEventListeners();
-  });
-  
-  // Ресайз при повороте
-  window.addEventListener('orientationchange', () => {
-    setTimeout(() => {
-      calculateBaseWidth();
-      applyZoomToAll();
-    }, 300);
-  });
+  loadComic();
 });
 
-// Фикс после полной загрузки
+// После полной загрузки
 window.addEventListener('load', () => {
-  setTimeout(() => {
-    calculateBaseWidth();
-    applyZoomToAll();
-  }, 100);
+  setTimeout(updatePageInfo, 100);
 });
 </script>
-
 </body>
 </html>
