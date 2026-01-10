@@ -308,9 +308,6 @@ button:active {
     #FFD700 100%);
   transition: width 0.2s ease;
   border-radius: 3px;
-  box-shadow: 
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    0 0 10px rgba(255, 165, 0, 0.4);
 }
 
 /* Адаптивность */
@@ -400,34 +397,3 @@ button:active {
     height: 4px;
   }
 }
-
-/* Анимация для индикатора */
-@keyframes softPulse {
-  0% { 
-    transform: translateX(-50%) scale(1);
-    box-shadow: 
-      0 8px 32px rgba(0, 0, 0, 0.5),
-      0 2px 8px rgba(255, 165, 0, 0.15);
-  }
-  50% { 
-    transform: translateX(-50%) scale(1.03);
-    box-shadow: 
-      0 12px 40px rgba(0, 0, 0, 0.6),
-      0 3px 12px rgba(255, 165, 0, 0.2);
-  }
-  100% { 
-    transform: translateX(-50%) scale(1);
-    box-shadow: 
-      0 8px 32px rgba(0, 0, 0, 0.5),
-      0 2px 8px rgba(255, 165, 0, 0.15);
-  }
-}
-
-.zoom-indicator.visible {
-  animation: softPulse 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Эффект свечения при наведении на кнопки - УБРАН */
-/* .nav-btn::after, .zoom-btn::after - удалено */
-
-/* Убраны все анимации свечения и мерцания */
