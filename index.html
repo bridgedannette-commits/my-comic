@@ -32,7 +32,64 @@
   
   /* Фикс для controls-wrapper */
   .controls-wrapper {
-    pointer-events: auto !important; /* ВАЖНО: переопределяем */
+    pointer-events: auto !important;
+    z-index: 1000 !important; /* Повышаем z-index */
+  }
+  
+  /* Мобильные кнопки поверх всего */
+  .mobile-controls {
+    display: none;
+    position: fixed;
+    bottom: env(safe-area-inset-bottom, 20px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 15, 15, 0.95);
+    border-radius: 25px;
+    padding: 12px 20px;
+    gap: 15px;
+    z-index: 10000; /* Очень высокий z-index */
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+    border: 1px solid rgba(255, 165, 0, 0.3);
+    align-items: center;
+  }
+  
+  .mobile-controls.show {
+    display: flex !important;
+  }
+  
+  .mobile-zoom-btn {
+    background: rgba(255, 165, 0, 0.2);
+    color: #FFA500;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 300;
+    border: 2px solid rgba(255, 165, 0, 0.3);
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  .mobile-zoom-btn:active {
+    background: rgba(255, 165, 0, 0.4);
+    transform: scale(0.95);
+  }
+  
+  .mobile-page-info {
+    color: white;
+    font-size: 15px;
+    font-weight: 500;
+    padding: 0 15px;
+    display: flex;
+    align-items: center;
+    min-width: 70px;
+    text-align: center;
+    justify-content: center;
+    font-family: 'Inter', sans-serif;
   }
   
   /* Гарантируем видимость кнопок на мобильных */
@@ -46,6 +103,36 @@
     .controls-wrapper {
       opacity: 1 !important;
       visibility: visible !important;
+      bottom: env(safe-area-inset-bottom, 0px) !important;
+    }
+    
+    .mobile-controls {
+      display: flex;
+    }
+    
+    .controls {
+      display: none !important; /* Скрываем старые кнопки на мобильных */
+    }
+  }
+  
+  /* Для очень маленьких экранов */
+  @media (max-width: 480px) {
+    .mobile-controls {
+      padding: 10px 16px;
+      gap: 12px;
+      bottom: max(10px, env(safe-area-inset-bottom, 10px));
+    }
+    
+    .mobile-zoom-btn {
+      width: 44px;
+      height: 44px;
+      font-size: 24px;
+    }
+    
+    .mobile-page-info {
+      font-size: 14px;
+      min-width: 60px;
+      padding: 0 12px;
     }
   }
 </style>
@@ -75,6 +162,13 @@
   <div class="progress">
     <div class="progress-bar" id="progressBar"></div>
   </div>
+  
+  <!-- Мобильные кнопки поверх всего -->
+  <div class="mobile-controls" id="mobileControls">
+    <div class="mobile-zoom-btn" id="mobileZoomOut">−</div>
+    <div class="mobile-page-info" id="mobilePageInfo">– / –</div>
+    <div class="mobile-zoom-btn" id="mobileZoomIn">+</div>
+  </div>
 </div>
 
 <script>
@@ -99,20 +193,22 @@ let zoom = 1.0;
 let pages = [];
 let images = [];
 let baseWidth = 600;
-let lastTap = { x: 0, y: 0, time: 0 };
+let zoomCenter = null; // Точка для зума
 
 const wrapper = document.getElementById('canvasWrapper');
-const controlsWrapper = document.getElementById('controlsWrapper');
 const pageInfo = document.getElementById('pageInfo');
+const mobilePageInfo = document.getElementById('mobilePageInfo');
 const progressBar = document.getElementById('progressBar');
 const zoomIndicator = document.getElementById('zoomIndicator');
 const zoomPercent = document.getElementById('zoomPercent');
+const mobileControls = document.getElementById('mobileControls');
+const mobileZoomIn = document.getElementById('mobileZoomIn');
+const mobileZoomOut = document.getElementById('mobileZoomOut');
 
 /* ======================================================
    ОСНОВНЫЕ ФУНКЦИИ
 ====================================================== */
 
-// Проверка существования изображения
 async function imageExists(url) {
   try {
     const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
@@ -122,7 +218,6 @@ async function imageExists(url) {
   }
 }
 
-// Поиск всех страниц
 async function detectPages() {
   const result = [];
   let pageNum = 1;
@@ -146,7 +241,6 @@ async function detectPages() {
   return result;
 }
 
-// Загрузка комикса
 async function loadComic() {
   wrapper.innerHTML = '<div style="color:#ccc;text-align:center;padding:50px;font-family:Inter,sans-serif;">Загрузка...</div>';
   
@@ -160,7 +254,6 @@ async function loadComic() {
   wrapper.innerHTML = '';
   images = new Array(pages.length);
   
-  // Создаем контейнеры для всех страниц сразу
   pages.forEach((page, index) => {
     const pageDiv = document.createElement('div');
     pageDiv.className = 'page-container';
@@ -187,7 +280,7 @@ async function loadComic() {
     
     img.onload = function() {
       images[index] = this;
-      applyZoomToImage(this, false);
+      applyZoomToImage(this);
     };
     
     pageDiv.appendChild(img);
@@ -196,20 +289,16 @@ async function loadComic() {
   
   updatePageInfo();
   calculateBaseWidth();
-  applyZoomToAll(false);
+  applyZoomToAll();
   
-  // Принудительно показываем кнопки
-  if (controlsWrapper) {
-    controlsWrapper.style.opacity = '1';
-    controlsWrapper.style.visibility = 'visible';
-    controlsWrapper.style.pointerEvents = 'auto';
+  // Показываем мобильные кнопки
+  if (isMobile && mobileControls) {
+    mobileControls.classList.add('show');
   }
   
-  // Загружаем остальные изображения
   setTimeout(() => loadRemainingImages(), 100);
 }
 
-// Загрузка оставшихся изображений
 function loadRemainingImages() {
   const imgs = wrapper.querySelectorAll('img[data-src]');
   imgs.forEach(img => {
@@ -218,7 +307,6 @@ function loadRemainingImages() {
   });
 }
 
-// Вычисление базовой ширины
 function calculateBaseWidth() {
   if (isMobile) {
     baseWidth = Math.min(800, window.innerWidth - 20);
@@ -228,11 +316,10 @@ function calculateBaseWidth() {
 }
 
 /* ======================================================
-   МАСШТАБИРОВАНИЕ (ИСПРАВЛЕННОЕ С ЦЕНТРИРОВАНИЕМ)
+   МАСШТАБИРОВАНИЕ БЕЗ ПРОКРУТКИ
 ====================================================== */
 
-// Применяем зум к одному изображению
-function applyZoomToImage(img, preservePosition = true) {
+function applyZoomToImage(img) {
   if (!img.naturalWidth) return;
   
   const naturalWidth = img.naturalWidth;
@@ -240,9 +327,6 @@ function applyZoomToImage(img, preservePosition = true) {
   const displayWidth = Math.floor(baseWidth * zoom);
   const scale = displayWidth / naturalWidth;
   const displayHeight = Math.floor(naturalHeight * scale);
-  
-  const oldWidth = parseInt(img.style.width) || naturalWidth;
-  const oldHeight = parseInt(img.style.height) || naturalHeight;
   
   img.style.width = displayWidth + 'px';
   img.style.height = displayHeight + 'px';
@@ -252,135 +336,62 @@ function applyZoomToImage(img, preservePosition = true) {
     container.style.width = displayWidth + 'px';
     container.style.height = displayHeight + 'px';
   }
-  
-  return { oldWidth, oldHeight, displayWidth, displayHeight };
 }
 
-// Применяем зум ко всем изображениям с сохранением позиции
-function applyZoomToAll(preserveScrollPosition = true) {
-  if (preserveScrollPosition) {
-    // Сохраняем текущую видимую область
-    const scrollTop = wrapper.scrollTop;
-    const scrollLeft = wrapper.scrollLeft;
-    const centerElement = getElementAtCenter();
-    
-    calculateBaseWidth();
-    const displayWidth = Math.floor(baseWidth * zoom);
-    
-    images.forEach((img, index) => {
-      if (img && img.naturalWidth) {
-        applyZoomToImage(img, true);
-      }
-    });
-    
-    // Восстанавливаем позицию через requestAnimationFrame
-    requestAnimationFrame(() => {
-      if (centerElement) {
-        // Центрируем элемент, который был в центре
-        centerElement.scrollIntoView({ block: 'center', behavior: 'instant' });
-      } else {
-        // Или восстанавливаем позицию прокрутки
-        wrapper.scrollTop = scrollTop * (zoom / (zoom - ZOOM_STEP));
-      }
-    });
-  } else {
-    calculateBaseWidth();
-    images.forEach(img => {
-      if (img && img.naturalWidth) {
-        applyZoomToImage(img, false);
-      }
-    });
-  }
+function applyZoomToAll() {
+  calculateBaseWidth();
+  
+  images.forEach(img => {
+    if (img && img.naturalWidth) {
+      applyZoomToImage(img);
+    }
+  });
   
   showZoomIndicator();
 }
 
-// Получить элемент в центре экрана
-function getElementAtCenter() {
-  const wrapperRect = wrapper.getBoundingClientRect();
-  const centerY = wrapperRect.top + wrapperRect.height / 2;
-  
-  let closestElement = null;
-  let minDistance = Infinity;
-  
-  wrapper.querySelectorAll('.page-container').forEach(container => {
-    const rect = container.getBoundingClientRect();
-    const center = rect.top + rect.height / 2;
-    const distance = Math.abs(center - centerY);
-    
-    if (distance < minDistance) {
-      minDistance = distance;
-      closestElement = container;
-    }
-  });
-  
-  return closestElement;
-}
-
-// Изменение зума с центрированием по точке
-function changeZoom(delta, centerX = null, centerY = null) {
+function changeZoom(delta) {
   const newZoom = zoom + delta;
   
   if (newZoom < MIN_ZOOM || newZoom > MAX_ZOOM) {
     return;
   }
   
-  // Если есть точка центра (для тапа/щипка)
-  if (centerX !== null && centerY !== null && isMobile) {
-    zoomAtPoint(newZoom, centerX, centerY);
-    return;
-  }
+  // Сохраняем позицию центра экрана
+  const wrapperRect = wrapper.getBoundingClientRect();
+  const centerX = wrapperRect.left + wrapperRect.width / 2;
+  const centerY = wrapperRect.top + wrapperRect.height / 2;
   
-  const oldZoom = zoom;
+  // Находим элемент в центре и его позицию
+  let centerElement = null;
+  let centerElementRatio = 0.5;
+  
+  const elements = wrapper.querySelectorAll('.page-container');
+  elements.forEach(element => {
+    const rect = element.getBoundingClientRect();
+    if (rect.top <= centerY && rect.bottom >= centerY) {
+      centerElement = element;
+      centerElementRatio = (centerY - rect.top) / rect.height;
+    }
+  });
+  
+  const oldScrollTop = wrapper.scrollTop;
+  
   zoom = Math.round(newZoom * 100) / 100;
+  applyZoomToAll();
   
-  // Сохраняем текущий скролл перед изменением
-  const scrollTop = wrapper.scrollTop;
-  const scrollHeight = wrapper.scrollHeight;
-  const clientHeight = wrapper.clientHeight;
-  
-  applyZoomToAll(true);
-  
-  // Плавное восстановление позиции
+  // Восстанавливаем позицию без прокрутки к элементу
   requestAnimationFrame(() => {
-    const newScrollHeight = wrapper.scrollHeight;
-    if (scrollHeight > 0 && newScrollHeight > 0) {
-      const scrollRatio = scrollTop / scrollHeight;
-      wrapper.scrollTop = newScrollHeight * scrollRatio;
+    if (centerElement) {
+      // Просто восстанавливаем позицию прокрутки
+      wrapper.scrollTop = oldScrollTop;
+    } else {
+      // Если элемент не найден, просто оставляем как есть
+      wrapper.scrollTop = oldScrollTop;
     }
   });
 }
 
-// Зум в конкретной точке (для мобильных)
-function zoomAtPoint(newZoom, centerX, centerY) {
-  const oldZoom = zoom;
-  
-  // Координаты относительно wrapper
-  const wrapperRect = wrapper.getBoundingClientRect();
-  const pointX = centerX - wrapperRect.left + wrapper.scrollLeft;
-  const pointY = centerY - wrapperRect.top + wrapper.scrollTop;
-  
-  // Сохраняем соотношение точки до зума
-  const pointRatioX = pointX / wrapper.scrollWidth;
-  const pointRatioY = pointY / wrapper.scrollHeight;
-  
-  zoom = Math.round(newZoom * 100) / 100;
-  applyZoomToAll(false);
-  
-  // Восстанавливаем позицию так, чтобы точка осталась на месте
-  requestAnimationFrame(() => {
-    const newScrollLeft = pointRatioX * wrapper.scrollWidth - (centerX - wrapperRect.left);
-    const newScrollTop = pointRatioY * wrapper.scrollHeight - (centerY - wrapperRect.top);
-    
-    wrapper.scrollTo({
-      left: Math.max(0, newScrollLeft),
-      top: Math.max(0, newScrollTop),
-      behavior: 'smooth'
-    });
-  });
-}
-
-// Показать индикатор зума
 function showZoomIndicator() {
   zoomPercent.textContent = Math.round(zoom * 100) + '%';
   zoomIndicator.classList.add('visible');
@@ -421,17 +432,27 @@ function getCurrentPage() {
 
 function updatePageInfo() {
   const current = getCurrentPage();
-  pageInfo.textContent = `${current} / ${pages.length}`;
+  const info = `${current} / ${pages.length}`;
+  pageInfo.textContent = info;
+  if (mobilePageInfo) {
+    mobilePageInfo.textContent = info;
+  }
 }
 
 /* ======================================================
-   ОБРАБОТЧИКИ СОБЫТИЙ (ИСПРАВЛЕННЫЕ)
+   ОБРАБОТЧИКИ СОБЫТИЙ
 ====================================================== */
 
 function setupEventListeners() {
-  // Кнопки зума
+  // Кнопки зума для десктопа
   document.getElementById('zoomIn').onclick = () => changeZoom(ZOOM_STEP);
   document.getElementById('zoomOut').onclick = () => changeZoom(-ZOOM_STEP);
+  
+  // Мобильные кнопки зума
+  if (mobileZoomIn && mobileZoomOut) {
+    mobileZoomIn.onclick = () => changeZoom(ZOOM_STEP);
+    mobileZoomOut.onclick = () => changeZoom(-ZOOM_STEP);
+  }
   
   // Навигация
   document.getElementById('toTop').onclick = () => {
@@ -461,7 +482,7 @@ function setupEventListeners() {
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(() => {
       calculateBaseWidth();
-      applyZoomToAll(false);
+      applyZoomToAll();
       updatePageInfo();
     }, 250);
   });
@@ -477,96 +498,49 @@ function setupEventListeners() {
   }
 }
 
-// Настройка тач-событий с зумом по точке
 function setupTouchEvents() {
-  let touchStartDistance = 0;
-  let touchStartZoom = zoom;
-  let initialTouches = [];
+  let lastTapTime = 0;
+  let lastTapX = 0;
+  let lastTapY = 0;
   
-  // Двойной тап для зума в точке тапа
+  // Двойной тап для зума (без перемещения)
   wrapper.addEventListener('touchend', (e) => {
     const currentTime = Date.now();
     const touch = e.changedTouches[0];
     
-    if (currentTime - lastTap.time < 300 &&
-        Math.abs(touch.clientX - lastTap.x) < 50 &&
-        Math.abs(touch.clientY - lastTap.y) < 50) {
+    if (currentTime - lastTapTime < 300 &&
+        Math.abs(touch.clientX - lastTapX) < 50 &&
+        Math.abs(touch.clientY - lastTapY) < 50) {
       e.preventDefault();
       
-      // Переключаем между 100% и 150% с центрированием по точке тапа
+      // Переключаем между 100% и 150%
       if (Math.abs(zoom - 1.0) < 0.1) {
-        changeZoom(0.5, touch.clientX, touch.clientY);
+        changeZoom(0.5);
       } else {
-        changeZoom(-0.5, touch.clientX, touch.clientY);
+        changeZoom(-0.5);
       }
     }
     
-    lastTap = {
-      x: touch.clientX,
-      y: touch.clientY,
-      time: currentTime
-    };
+    lastTapTime = currentTime;
+    lastTapX = touch.clientX;
+    lastTapY = touch.clientY;
   }, { passive: false });
   
-  // Щипок для зума
-  wrapper.addEventListener('touchstart', (e) => {
-    if (e.touches.length === 2) {
-      initialTouches = [e.touches[0], e.touches[1]];
-      touchStartDistance = getTouchDistance(initialTouches);
-      touchStartZoom = zoom;
-    }
-  }, { passive: true });
-  
-  wrapper.addEventListener('touchmove', (e) => {
-    if (e.touches.length === 2) {
-      e.preventDefault();
+  // Скрываем мобильные кнопки при скролле, показываем при остановке
+  let scrollHideTimeout;
+  wrapper.addEventListener('scroll', () => {
+    if (mobileControls) {
+      mobileControls.style.opacity = '0.3';
+      mobileControls.style.transition = 'opacity 0.2s';
       
-      const currentDistance = getTouchDistance(e.touches);
-      const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      
-      const scale = currentDistance / touchStartDistance;
-      const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, touchStartZoom * scale));
-      
-      if (Math.abs(newZoom - zoom) > 0.05) {
-        zoom = newZoom;
-        applyZoomToAll(false);
-        
-        // Центрируем по средней точке щипка
-        const wrapperRect = wrapper.getBoundingClientRect();
-        const pointX = centerX - wrapperRect.left + wrapper.scrollLeft;
-        const pointY = centerY - wrapperRect.top + wrapper.scrollTop;
-        
-        const pointRatioX = pointX / wrapper.scrollWidth;
-        const pointRatioY = pointY / wrapper.scrollHeight;
-        
-        requestAnimationFrame(() => {
-          const newScrollLeft = pointRatioX * wrapper.scrollWidth - (centerX - wrapperRect.left);
-          const newScrollTop = pointRatioY * wrapper.scrollHeight - (centerY - wrapperRect.top);
-          
-          wrapper.scrollLeft = Math.max(0, newScrollLeft);
-          wrapper.scrollTop = Math.max(0, newScrollTop);
-        });
-      }
-    }
-  }, { passive: false });
-  
-  wrapper.addEventListener('touchend', () => {
-    if (initialTouches.length > 0) {
-      showZoomIndicator();
-      initialTouches = [];
+      clearTimeout(scrollHideTimeout);
+      scrollHideTimeout = setTimeout(() => {
+        mobileControls.style.opacity = '1';
+      }, 300);
     }
   }, { passive: true });
 }
 
-// Расстояние между двумя касаниями
-function getTouchDistance(touches) {
-  const dx = touches[0].clientX - touches[1].clientX;
-  const dy = touches[0].clientY - touches[1].clientY;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
-// Обработка клавиатуры
 function handleKeydown(e) {
   if (e.ctrlKey || e.metaKey) {
     if (e.key === '+' || e.key === '=') {
@@ -582,7 +556,7 @@ function handleKeydown(e) {
     if (e.key === '0') {
       e.preventDefault();
       zoom = 1.0;
-      applyZoomToAll(true);
+      applyZoomToAll();
       return;
     }
   }
@@ -626,11 +600,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.documentElement.style.overflow = 'hidden';
   document.body.style.overflow = 'hidden';
   
-  // Фикс для кнопок
-  if (controlsWrapper) {
-    controlsWrapper.style.pointerEvents = 'auto';
-    controlsWrapper.style.opacity = '1';
-    controlsWrapper.style.visibility = 'visible';
+  // Фикс для безопасных зон на мобильных
+  if (isMobile) {
+    document.documentElement.style.paddingBottom = 'env(safe-area-inset-bottom)';
   }
   
   // Загружаем комикс
@@ -642,7 +614,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('orientationchange', () => {
     setTimeout(() => {
       calculateBaseWidth();
-      applyZoomToAll(false);
+      applyZoomToAll();
     }, 300);
   });
 });
@@ -651,7 +623,7 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('load', () => {
   setTimeout(() => {
     calculateBaseWidth();
-    applyZoomToAll(false);
+    applyZoomToAll();
   }, 100);
 });
 </script>
