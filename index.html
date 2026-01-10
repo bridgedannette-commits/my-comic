@@ -79,6 +79,11 @@ async function initPDF() {
     }
     
     await renderAllPages();
+    setTimeout(async () => {
+       if (pdfDoc) {
+           await renderPage(1, currentRenderId);
+    }
+}, 1000);
     setupEventListeners();
     
     // Устанавливаем комикс на всю страницу
