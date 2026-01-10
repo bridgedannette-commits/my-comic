@@ -383,18 +383,15 @@ button:active {
 }
 
 .comic-canvas {
-  transform-origin: top center;
+  transform-origin: 50% 0%;
+  width: 100%;
+  max-width: 100vw;
 }
 
 .comic-page img {
   max-width: 100%;
   height: auto;
   display: block;
-}
-
-.comic-canvas {
-  width: 100%;
-  max-width: 100vw;
 }
 
 
