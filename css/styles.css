@@ -105,29 +105,28 @@ canvas:active {
   width: 100%;
   z-index: 100;
   pointer-events: auto !important;
-  transition: transform 0.3s ease, opacity 0.3s ease;
+  transition: transform 0.3s ease;
 }
 
 .header {
-  background: rgba(15, 15, 15, 0.8);
+  background: rgba(15, 15, 15, 0.85);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 15px 10px !important;
+  padding: 15px 20px;
   width: 100%;
   pointer-events: auto;
   min-height: 60px;
-  border-bottom: 1px solid rgba(255, 165, 0, 0.1);
+  border-bottom: 1px solid rgba(255, 165, 0, 0.15);
   z-index: 101;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  /* Убрали backdrop-filter - просто полупрозрачная панель */
 }
 
 .comic-title {
   font-size: 18px;
   font-weight: 600;
   color: #fff;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
@@ -173,19 +172,17 @@ canvas:active {
   width: 100%;
   z-index: 100;
   pointer-events: auto !important; /* ВАЖНО: исправляем проблему с кнопками */
-  transition: transform 0.3s ease, opacity 0.3s ease;
+  transition: transform 0.3s ease;
 }
 
-/* Стили для скрытых панелей */
+/* Стили для скрытых панелей - только трансформация, без изменения opacity */
 .header-wrapper.hidden {
   transform: translateY(-100%);
-  opacity: 0;
   pointer-events: none;
 }
 
 .controls-wrapper.hidden {
   transform: translateY(100%);
-  opacity: 0;
   pointer-events: none;
 }
 
@@ -264,7 +261,7 @@ canvas:active {
 
 /* Навигационная панель */
 .controls {
-  background: rgba(15, 15, 15, 0.8);
+  background: rgba(15, 15, 15, 0.85);
   display: flex;
   justify-content: center;
   gap: 15px;
@@ -273,10 +270,9 @@ canvas:active {
   width: 100%;
   pointer-events: auto;
   min-height: 70px;
-  border-top: 1px solid rgba(255, 165, 0, 0.1);
+  border-top: 1px solid rgba(255, 165, 0, 0.15);
   z-index: 101;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  /* Убрали backdrop-filter - просто полупрозрачная панель */
 }
 
 /* Кнопки навигации в начало/конец - МЕНЬШЕЕ СВЕЧЕНИЕ */
@@ -299,14 +295,17 @@ canvas:active {
   -webkit-tap-highlight-color: transparent; /* Убираем синий highlight на тап */
 }
 
-.nav-btn:hover {
-  background: rgba(255, 165, 0, 0.9);
-  color: #000;
-  transform: scale(1.15);
-  /* Меньшее свечение при наведении */
-  box-shadow: 
-    0 0 12px rgba(255, 165, 0, 0.6),
-    0 0 24px rgba(255, 165, 0, 0.3);
+/* На мобильных устройствах - НЕ РЫЖИЕ КНОПКИ */
+@media (hover: hover) {
+  .nav-btn:hover {
+    background: rgba(255, 165, 0, 0.9);
+    color: #000;
+    transform: scale(1.15);
+    /* Меньшее свечение при наведении */
+    box-shadow: 
+      0 0 12px rgba(255, 165, 0, 0.6),
+      0 0 24px rgba(255, 165, 0, 0.3);
+  }
 }
 
 .nav-btn:active {
@@ -339,14 +338,17 @@ canvas:active {
   -webkit-tap-highlight-color: transparent; /* Убираем синий highlight на тап */
 }
 
-.zoom-btn:hover {
-  background: rgba(255, 165, 0, 0.9);
-  color: #000;
-  transform: scale(1.15);
-  /* Меньшее свечение при наведении */
-  box-shadow: 
-    0 0 12px rgba(255, 165, 0, 0.6),
-    0 0 24px rgba(255, 165, 0, 0.3);
+/* На мобильных устройствах - НЕ РЫЖИЕ КНОПКИ */
+@media (hover: hover) {
+  .zoom-btn:hover {
+    background: rgba(255, 165, 0, 0.9);
+    color: #000;
+    transform: scale(1.15);
+    /* Меньшее свечение при наведении */
+    box-shadow: 
+      0 0 12px rgba(255, 165, 0, 0.6),
+      0 0 24px rgba(255, 165, 0, 0.3);
+  }
 }
 
 .zoom-btn:active {
@@ -379,8 +381,11 @@ button {
   -webkit-tap-highlight-color: transparent; /* Убираем синий highlight на тап */
 }
 
-button:hover {
-  transform: scale(1.15);
+/* На мобильных устройствах - НЕ РЫЖИЕ КНОПКИ */
+@media (hover: hover) {
+  button:hover {
+    transform: scale(1.15);
+  }
 }
 
 button:active {
@@ -479,9 +484,7 @@ button:active {
     padding: 10px 0 !important;
     gap: 8px !important;
     min-height: 50px !important;
-    background: rgba(10, 10, 10, 0.8) !important;
-    opacity: 1 !important;
-    visibility: visible !important;
+    background: rgba(10, 10, 10, 0.95) !important;
     display: flex !important;
   }
   
@@ -503,10 +506,6 @@ button:active {
   .nav-btn, .zoom-btn {
     width: 36px !important;
     height: 36px !important;
-  }
-  
-  .nav-btn:hover, .zoom-btn:hover, .header-btn:hover {
-    transform: scale(1.1) !important;
   }
   
   .zoom-btn {
