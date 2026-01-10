@@ -80,11 +80,16 @@ canvas:active {
 /* Обертка для навигационной панели */
 .controls-wrapper {
   position: absolute;
-  bottom: 0;
   left: 0;
   width: 100%;
   z-index: 100;
   pointer-events: none;
+
+  bottom: env(safe-area-inset-bottom);
+}
+
+.controls {
+  padding-bottom: calc(15px + env(safe-area-inset-bottom));
 }
 
 /* Индикатор масштаба */
