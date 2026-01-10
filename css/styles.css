@@ -107,6 +107,10 @@ canvas:active {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   pointer-events: none;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  /* Фикс для артефактов */
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateX(-50%) translateZ(0);
 }
 
 .zoom-indicator.visible {
@@ -119,12 +123,12 @@ canvas:active {
   letter-spacing: 0.5px;
 }
 
-/* Навигационная панель - ИСПРАВЛЕННЫЙ БЛЮР */
 /* Навигационная панель - БЛЮР БЕЗ АРТЕФАКТОВ */
 .controls {
-  background: rgba(25, 25, 25, 0.85);
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
+  position: relative;
+  background: rgba(25, 25, 25, 0.6); /* Полупрозрачный фон для блюра */
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   display: flex;
   justify-content: center;
   gap: 15px;
@@ -134,18 +138,15 @@ canvas:active {
   pointer-events: auto;
   min-height: 70px;
   border-top: 1px solid rgba(255, 165, 0, 0.1);
-  position: relative;
   z-index: 101;
   /* Фикс для артефактов блюра */
   -webkit-backface-visibility: hidden;
-  -moz-backface-visibility: hidden;
-  -webkit-transform: translate3d(0, 0, 0);
-  -moz-transform: translate3d(0, 0, 0);
-  transform: translate3d(0, 0, 0);
-  isolation: isolate;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: transform;
 }
 
-/* Создаем отдельный слой для блюра чтобы избежать артефактов */
+/* Дополнительный фон для улучшения блюра */
 .controls::before {
   content: '';
   position: absolute;
@@ -153,22 +154,16 @@ canvas:active {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(25, 25, 25, 0.6); /* Более прозрачный фон для блюра */
-  backdrop-filter: blur(15px);
-  -webkit-backdrop-filter: blur(15px);
+  background: rgba(20, 20, 20, 0.7);
   z-index: -1;
-  border-radius: 0; /* Убираем скругления чтобы не было артефактов */
-}
-
-/* Контейнер для содержимого панели */
-.controls > * {
-  position: relative;
-  z-index: 1;
+  /* Фикс для Safari */
+  -webkit-backdrop-filter: blur(0);
+  backdrop-filter: blur(0);
 }
 
 /* Кнопки навигации в начало/конец */
 .nav-btn {
-  background: rgba(40, 40, 40, 0.95);
+  background: rgba(40, 40, 40, 0.9);
   color: #fff;
   font-size: 16px;
   width: 44px;
@@ -181,20 +176,21 @@ canvas:active {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  /* Убираем transformY при наведении */
-  transform: translateY(0);
+  position: relative;
+  z-index: 2;
+  transform: scale(1);
 }
 
 .nav-btn:hover {
   background: rgba(255, 165, 0, 0.9);
   color: #000;
-  /* Только увеличение, без подъема */
-  transform: scale(1.15); /* Увеличение вместо подъема */
+  transform: scale(1.15);
+  box-shadow: 0 5px 15px rgba(255, 165, 0, 0.3);
 }
 
 /* Кнопки зума */
 .zoom-btn {
-  background: rgba(40, 40, 40, 0.95);
+  background: rgba(40, 40, 40, 0.9);
   color: #fff;
   font-size: 24px;
   width: 44px;
@@ -208,15 +204,16 @@ canvas:active {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  /* Убираем transformY при наведении */
-  transform: translateY(0);
+  position: relative;
+  z-index: 2;
+  transform: scale(1);
 }
 
 .zoom-btn:hover {
   background: rgba(255, 165, 0, 0.9);
   color: #000;
-  /* Только увеличение, без подъема */
-  transform: scale(1.15); /* Увеличение вместо подъема */
+  transform: scale(1.15);
+  box-shadow: 0 5px 15px rgba(255, 165, 0, 0.3);
 }
 
 button {
@@ -236,15 +233,16 @@ button {
   position: relative;
   overflow: hidden;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  transform: translateY(0); /* Гарантируем отсутствие смещения */
+  transform: scale(1);
 }
 
 button:hover {
-  transform: scale(1.15); /* Только увеличение */
+  transform: scale(1.15);
 }
 
 button:active {
-  transform: scale(0.95); /* Легкое уменьшение при клике */
+  transform: scale(0.95);
+  transition: transform 0.1s ease;
 }
 
 #pageInfo {
@@ -254,7 +252,7 @@ button:active {
   min-width: 90px;
   text-align: center;
   color: #fff;
-  background: rgba(40, 40, 40, 0.95);
+  background: rgba(40, 40, 40, 0.9);
   border-radius: 25px;
   height: 44px;
   display: flex;
@@ -264,6 +262,10 @@ button:active {
   margin: 0 10px;
   letter-spacing: 0.3px;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  position: relative;
+  z-index: 2;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 /* Прогресс-бар над навигационной панелью */
@@ -279,12 +281,13 @@ button:active {
   -webkit-backdrop-filter: blur(5px);
   border-radius: 3px;
   margin: 0;
+  overflow: hidden;
 }
 
 .progress-bar {
   height: 100%;
   width: 0%;
-  /* Более явный оранжево-желтый градиент */
+  /* Яркий оранжево-желтый градиент */
   background: linear-gradient(90deg, 
     #FF8C00 0%, 
     #FFA500 25%, 
@@ -294,22 +297,51 @@ button:active {
   transition: width 0.2s ease;
   border-radius: 3px;
   box-shadow: 
-    0 0 15px rgba(255, 140, 0, 0.4),
-    0 0 30px rgba(255, 165, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    0 0 15px rgba(255, 140, 0, 0.5),
+    0 0 30px rgba(255, 165, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  position: relative;
+}
+
+/* Свечение для прогресс-бара */
+.progress-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  animation: shimmer 2s infinite;
+  border-radius: 3px;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 /* Адаптивность */
 @media (max-width: 768px) {
   .comic-reader {
     height: 100vh !important;
-    border-radius: 0 !important;
   }
   
   .controls {
     padding: 12px 0;
     gap: 10px;
     min-height: 60px;
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
   }
   
   .zoom-indicator {
@@ -317,6 +349,8 @@ button:active {
     padding: 8px 16px;
     font-size: 14px;
     border-radius: 20px;
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
   }
   
   button, .nav-btn, .zoom-btn {
@@ -341,18 +375,13 @@ button:active {
     padding: 0 16px;
     height: 40px;
     border-radius: 22px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
   
   .progress {
     bottom: 60px;
     height: 5px;
-  }
-  
-  .progress-bar {
-    box-shadow: 
-      0 0 10px rgba(255, 140, 0, 0.4),
-      0 0 20px rgba(255, 165, 0, 0.2),
-      inset 0 1px 0 rgba(255, 255, 255, 0.3);
   }
 }
 
@@ -361,6 +390,8 @@ button:active {
     gap: 8px;
     padding: 10px 0;
     min-height: 55px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
   
   .zoom-indicator {
@@ -368,6 +399,8 @@ button:active {
     padding: 6px 14px;
     font-size: 13px;
     border-radius: 18px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
   
   #pageInfo {
@@ -376,6 +409,8 @@ button:active {
     padding: 0 14px;
     height: 38px;
     border-radius: 20px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
   }
   
   button, .nav-btn, .zoom-btn {
@@ -392,13 +427,6 @@ button:active {
   .progress {
     bottom: 55px;
     height: 4px;
-  }
-  
-  .progress-bar {
-    box-shadow: 
-      0 0 8px rgba(255, 140, 0, 0.4),
-      0 0 15px rgba(255, 165, 0, 0.2),
-      inset 0 1px 0 rgba(255, 255, 255, 0.3);
   }
 }
 
@@ -422,45 +450,64 @@ button:active {
   animation: softPulse 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Эффект свечения при наведении на кнопки - только для оранжевых кнопок */
-.nav-btn:hover::after,
-.zoom-btn:hover::after {
+/* Эффект свечения при наведении на кнопки */
+.nav-btn::after,
+.zoom-btn::after {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
-  background: radial-gradient(circle at center, rgba(255, 165, 0, 0.3), transparent 70%);
+  background: radial-gradient(circle at center, rgba(255, 165, 0, 0.4), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
   pointer-events: none;
+  z-index: -1;
 }
 
-/* Убираем артефакты блюра для всего контейнера */
-#reader {
-  -webkit-backface-visibility: hidden;
-  -moz-backface-visibility: hidden;
-  -webkit-transform: translate3d(0, 0, 0);
-  -moz-transform: translate3d(0, 0, 0);
-  transform: translate3d(0, 0, 0);
+.nav-btn:hover::after,
+.zoom-btn:hover::after {
+  opacity: 1;
 }
 
-/* Дополнительный фикс для черной полосы */
-.controls-wrapper {
-  -webkit-backface-visibility: hidden;
-  -moz-backface-visibility: hidden;
-  backface-visibility: hidden;
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
-  -moz-transform: translateZ(0);
-}
-
-/* Фикс для блюра в Firefox */
+/* Фикс для Firefox */
 @supports (-moz-appearance:none) {
   .controls {
-    background: rgba(25, 25, 25, 1); /* В Firefox делаем полностью непрозрачным */
+    background: rgba(25, 25, 25, 0.85); /* Более плотный фон в Firefox */
   }
+  
   .zoom-indicator {
-    background: rgba(30, 30, 30, 1);
+    background: rgba(30, 30, 30, 0.9);
   }
+  
+  /* В Firefox блюр может работать плохо, уменьшаем интенсивность */
+  .controls,
+  .zoom-indicator,
+  #pageInfo,
+  .progress {
+    backdrop-filter: blur(10px) !important;
+  }
+}
+
+/* Фикс для Safari */
+@supports (-webkit-backdrop-filter: blur(1px)) {
+  .controls {
+    -webkit-backdrop-filter: blur(20px);
+  }
+}
+
+/* Фикс для предотвращения артефактов рендеринга */
+#reader {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Убираем возможные полосы при наложении */
+.controls-wrapper,
+.controls,
+.progress {
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
 }
