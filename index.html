@@ -45,6 +45,7 @@ const ZOOM_STEP = 0.2;
 
 let currentRenderId = 0;
 let zoomIndicatorTimeout = null;
+let isZooming = false;
 
 const wrapper = document.getElementById("canvasWrapper");
 const pageInfo = document.getElementById("pageInfo");
@@ -62,7 +63,7 @@ const canvases = [];
 // Инициализация PDF
 async function initPDF() {
   try {
-    wrapper.innerHTML = '<div style="color: #ccc; text-align: center; padding: 50px; font-size: 16px; font-family: \'Inter\', sans-serif;">Loading...</div>';
+    wrapper.innerHTML = '<div style="color: #ccc; text-align: center; padding: 50px; font-size: 16px; font-family: \'Inter\', sans-serif;">Загрузка комикса...</div>';
     
     pdfDoc = await pdfjsLib.getDocument(PDF_URL).promise;
     
@@ -70,7 +71,7 @@ async function initPDF() {
     
     pageInfo.textContent = `1 / ${pdfDoc.numPages}`;
     
-    // Создаем контейнер для canvas элементов
+    // Создаем контейнеры для canvas элементов
     for (let i = 1; i <= pdfDoc.numPages; i++) {
       const container = document.createElement("div");
       container.className = 'page-container';
@@ -87,7 +88,7 @@ async function initPDF() {
       canvases.push({canvas, container});
     }
     
-    await renderAllPages();
+    await renderVisiblePages();
     setupEventListeners();
     
     // Устанавливаем комикс на всю страницу
@@ -105,72 +106,116 @@ function getTargetWidth() {
     return Math.min(800, window.innerWidth * 0.95);
 }
 
-// Рендерим одну страницу - УПРОЩЕННАЯ ВЕРСИЯ
-async function renderPage(pageNum, renderId) {
-  if (!pdfDoc || renderId !== currentRenderId) return;
+// Получаем видимые страницы
+function getVisiblePages() {
+  const visiblePages = [];
+  const wrapperRect = wrapper.getBoundingClientRect();
+  const viewportHeight = window.innerHeight;
   
-  const page = await pdfDoc.getPage(pageNum);
-  const {canvas, container} = canvases[pageNum - 1];
-  const ctx = canvas.getContext("2d");
-  
-  // Получаем ориентацию страницы
-  const rotation = page.rotate || 0;
-  
-  // Получаем размеры viewport
-  const viewport = page.getViewport({ scale: 1 });
-  const targetWidth = getTargetWidth();
-  
-  // Вычисляем масштаб с учетом поворота
-  let displayWidth, displayHeight;
-  if (rotation === 90 || rotation === 270) {
-    // Для повернутых страниц используем высоту как ширину
-    displayWidth = targetWidth;
-    displayHeight = (viewport.height / viewport.width) * targetWidth;
-  } else {
-    displayWidth = targetWidth;
-    displayHeight = (viewport.height / viewport.width) * targetWidth;
+  for (let i = 0; i < canvases.length; i++) {
+    const canvas = canvases[i].canvas;
+    const rect = canvas.getBoundingClientRect();
+    
+    // Проверяем, находится ли canvas в видимой области
+    if (rect.bottom >= wrapperRect.top - viewportHeight && 
+        rect.top <= wrapperRect.bottom + viewportHeight) {
+      visiblePages.push(i + 1);
+    }
   }
   
-  // Применяем зум
-  const finalScale = (displayWidth / viewport.width) * zoom;
-  
-  // Создаем viewport с учетом поворота и зума
-  const scaledViewport = page.getViewport({ 
-    scale: finalScale,
-    rotation: rotation
-  });
-  
-  // Устанавливаем размеры canvas
-  canvas.width = scaledViewport.width;
-  canvas.height = scaledViewport.height;
-  canvas.style.width = `${scaledViewport.width}px`;
-  canvas.style.height = `${scaledViewport.height}px`;
-  canvas.style.display = 'block';
-  canvas.style.margin = '20px auto';
-  
-  // Очищаем canvas
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  
-  // Настраиваем контекст рендеринга
-  const renderContext = {
-    canvasContext: ctx,
-    viewport: scaledViewport
-  };
+  return visiblePages;
+}
+
+// Рендерим одну страницу
+async function renderPage(pageNum, renderId, isPriority = false) {
+  if (!pdfDoc || renderId !== currentRenderId) return;
   
   try {
+    const page = await pdfDoc.getPage(pageNum);
+    const {canvas, container} = canvases[pageNum - 1];
+    const ctx = canvas.getContext("2d");
+    
+    // Получаем ориентацию страницы
+    const rotation = page.rotate || 0;
+    
+    // Получаем размеры viewport
+    const viewport = page.getViewport({ scale: 1 });
+    const targetWidth = getTargetWidth();
+    
+    // Вычисляем масштаб
+    const displayWidth = targetWidth;
+    const displayHeight = (viewport.height / viewport.width) * targetWidth;
+    
+    // Применяем зум
+    const finalScale = (displayWidth / viewport.width) * zoom;
+    
+    // Создаем viewport с учетом поворота и зума
+    const scaledViewport = page.getViewport({ 
+      scale: finalScale,
+      rotation: rotation
+    });
+    
+    // Устанавливаем размеры canvas
+    canvas.width = scaledViewport.width;
+    canvas.height = scaledViewport.height;
+    canvas.style.width = `${scaledViewport.width}px`;
+    canvas.style.height = `${scaledViewport.height}px`;
+    canvas.style.display = 'block';
+    canvas.style.margin = '20px auto';
+    
+    // Очищаем canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Настраиваем контекст рендеринга
+    const renderContext = {
+      canvasContext: ctx,
+      viewport: scaledViewport
+    };
+    
     await page.render(renderContext).promise;
+    
   } catch (error) {
-    console.warn(`Ошибка рендеринга страницы ${pageNum}:`, error);
+    if (error.name !== 'RenderingCancelled') {
+      console.warn(`Ошибка рендеринга страницы ${pageNum}:`, error);
+    }
   }
 }
 
-// Рендерим все страницы - ПРОСТАЯ ВЕРСИЯ
+// Рендерим видимые страницы с приоритетом
+async function renderVisiblePages() {
+  const renderId = ++currentRenderId;
+  const visiblePages = getVisiblePages();
+  
+  // Сначала рендерим видимые страницы
+  for (const pageNum of visiblePages) {
+    if (renderId !== currentRenderId) return;
+    await renderPage(pageNum, renderId, true);
+  }
+  
+  // Затем рендерим остальные страницы в фоне
+  for (let i = 1; i <= pdfDoc.numPages; i++) {
+    if (!visiblePages.includes(i) && renderId === currentRenderId) {
+      // Небольшая задержка между фоновыми страницами
+      await new Promise(resolve => setTimeout(resolve, 50));
+      await renderPage(i, renderId, false);
+    }
+  }
+}
+
+// Рендерим все страницы (для зума)
 async function renderAllPages() {
   const renderId = ++currentRenderId;
   
+  // Для зума рендерим все страницы, но с небольшими задержками
   for (let i = 1; i <= pdfDoc.numPages; i++) {
     if (renderId !== currentRenderId) return;
-    await renderPage(i, renderId);
+    
+    // При зуме даем небольшую задержку между страницами
+    if (i > 1) {
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    
+    await renderPage(i, renderId, true);
   }
 }
 
@@ -188,8 +233,11 @@ function showZoomIndicator() {
   }, 1500);
 }
 
-// Применяем зум
+// Применяем зум с оптимизацией
+let zoomDebounceTimer;
 async function applyZoom(delta) {
+  if (isZooming) return;
+  
   const newZoom = zoom + delta;
   
   if (newZoom < MIN_ZOOM || newZoom > MAX_ZOOM) {
@@ -198,7 +246,30 @@ async function applyZoom(delta) {
   
   zoom = parseFloat(newZoom.toFixed(2));
   showZoomIndicator();
-  await renderAllPages();
+  
+  // Отменяем предыдущий таймер
+  if (zoomDebounceTimer) {
+    clearTimeout(zoomDebounceTimer);
+  }
+  
+  // Блокируем зум на время рендеринга
+  isZooming = true;
+  zoomInBtn.disabled = true;
+  zoomOutBtn.disabled = true;
+  
+  try {
+    // Ждем немного перед рендерингом (дебаунс)
+    await new Promise(resolve => {
+      zoomDebounceTimer = setTimeout(resolve, 100);
+    });
+    
+    await renderAllPages();
+  } finally {
+    // Разблокируем кнопки
+    isZooming = false;
+    zoomInBtn.disabled = false;
+    zoomOutBtn.disabled = false;
+  }
 }
 
 // Обновляем информацию о странице
@@ -270,6 +341,11 @@ function setupEventListeners() {
     }
     
     updatePageInfo();
+    
+    // Перерисовываем видимые страницы при скролле
+    requestAnimationFrame(() => {
+      renderVisiblePages();
+    });
   }, { passive: true });
   
   document.addEventListener('keydown', (e) => {
@@ -314,7 +390,7 @@ function setupEventListeners() {
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(async () => {
       if (pdfDoc) {
-        await renderAllPages();
+        await renderVisiblePages();
         updatePageInfo();
       }
     }, 250);
@@ -356,6 +432,15 @@ function setupEventListeners() {
       const walk = (startY - e.touches[0].clientY) * 2;
       wrapper.scrollTop = scrollTop + walk;
     }
+  }, { passive: true });
+  
+  // Ленивая загрузка при скролле
+  let scrollTimeout;
+  wrapper.addEventListener('scroll', () => {
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+      renderVisiblePages();
+    }, 100);
   }, { passive: true });
 }
 
