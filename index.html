@@ -10,6 +10,45 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Дополнительные стили для фиксов */
+  .page-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    margin: 0 auto;
+    padding: 0;
+    position: relative;
+    transition: transform 0.1s ease;
+  }
+  
+  .page-container img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+  
+  /* Фикс для controls-wrapper */
+  .controls-wrapper {
+    pointer-events: auto !important; /* ВАЖНО: переопределяем */
+  }
+  
+  /* Гарантируем видимость кнопок на мобильных */
+  @media (max-width: 768px) {
+    .controls {
+      opacity: 1 !important;
+      visibility: visible !important;
+      display: flex !important;
+    }
+    
+    .controls-wrapper {
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
+  }
+</style>
 </head>
 
 <body>
@@ -23,7 +62,7 @@
     <span id="zoomPercent">100%</span>
   </div>
 
-  <div class="controls-wrapper">
+  <div class="controls-wrapper" id="controlsWrapper">
     <div class="controls" id="controls">
       <button id="toTop" title="В начало">▲</button>
       <button id="zoomOut" title="Уменьшить">−</button>
@@ -58,12 +97,12 @@ const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
 ====================================================== */
 let zoom = 1.0;
 let pages = [];
-let images = []; // Массив загруженных изображений
-let isDragging = false;
-let startY = 0;
-let startScrollTop = 0;
+let images = [];
+let baseWidth = 600;
+let lastTap = { x: 0, y: 0, time: 0 };
 
 const wrapper = document.getElementById('canvasWrapper');
+const controlsWrapper = document.getElementById('controlsWrapper');
 const pageInfo = document.getElementById('pageInfo');
 const progressBar = document.getElementById('progressBar');
 const zoomIndicator = document.getElementById('zoomIndicator');
@@ -109,12 +148,12 @@ async function detectPages() {
 
 // Загрузка комикса
 async function loadComic() {
-  wrapper.innerHTML = '<div style="color:#ccc;text-align:center;padding:50px;">Загрузка...</div>';
+  wrapper.innerHTML = '<div style="color:#ccc;text-align:center;padding:50px;font-family:Inter,sans-serif;">Загрузка...</div>';
   
   pages = await detectPages();
   
   if (pages.length === 0) {
-    wrapper.innerHTML = '<div style="color:#fff;text-align:center;padding:50px;">Комикс не найден</div>';
+    wrapper.innerHTML = '<div style="color:#fff;text-align:center;padding:50px;font-family:Inter,sans-serif;">Комикс не найден</div>';
     return;
   }
   
@@ -136,10 +175,10 @@ async function loadComic() {
     img.style.display = 'block';
     img.style.margin = '0';
     img.style.padding = '0';
-    img.style.width = '100%';
+    img.style.width = 'auto';
     img.style.height = 'auto';
+    img.style.maxWidth = '100%';
     
-    // Предзагрузка для плавности
     if (index < 3) {
       img.src = page.url;
     } else {
@@ -148,7 +187,7 @@ async function loadComic() {
     
     img.onload = function() {
       images[index] = this;
-      applyZoomToImage(this);
+      applyZoomToImage(this, false);
     };
     
     pageDiv.appendChild(img);
@@ -156,7 +195,15 @@ async function loadComic() {
   });
   
   updatePageInfo();
-  applyZoomToAll(); // Применяем начальный зум
+  calculateBaseWidth();
+  applyZoomToAll(false);
+  
+  // Принудительно показываем кнопки
+  if (controlsWrapper) {
+    controlsWrapper.style.opacity = '1';
+    controlsWrapper.style.visibility = 'visible';
+    controlsWrapper.style.pointerEvents = 'auto';
+  }
   
   // Загружаем остальные изображения
   setTimeout(() => loadRemainingImages(), 100);
@@ -171,89 +218,165 @@ function loadRemainingImages() {
   });
 }
 
-/* ======================================================
-   МАСШТАБИРОВАНИЕ (ИСПРАВЛЕННОЕ)
-====================================================== */
-
-// Получаем базовую ширину
-function getBaseWidth() {
+// Вычисление базовой ширины
+function calculateBaseWidth() {
   if (isMobile) {
-    return Math.min(800, window.innerWidth - 20);
+    baseWidth = Math.min(800, window.innerWidth - 20);
+  } else {
+    baseWidth = Math.min(1000, window.innerWidth * 0.9);
   }
-  return Math.min(1000, window.innerWidth * 0.9);
 }
 
+/* ======================================================
+   МАСШТАБИРОВАНИЕ (ИСПРАВЛЕННОЕ С ЦЕНТРИРОВАНИЕМ)
+====================================================== */
+
 // Применяем зум к одному изображению
-function applyZoomToImage(img) {
+function applyZoomToImage(img, preservePosition = true) {
   if (!img.naturalWidth) return;
   
-  const baseWidth = getBaseWidth();
   const naturalWidth = img.naturalWidth;
   const naturalHeight = img.naturalHeight;
-  
-  // Вычисляем ширину с учетом зума
   const displayWidth = Math.floor(baseWidth * zoom);
   const scale = displayWidth / naturalWidth;
   const displayHeight = Math.floor(naturalHeight * scale);
   
-  // Устанавливаем размеры
+  const oldWidth = parseInt(img.style.width) || naturalWidth;
+  const oldHeight = parseInt(img.style.height) || naturalHeight;
+  
   img.style.width = displayWidth + 'px';
   img.style.height = displayHeight + 'px';
   
-  // Устанавливаем размеры родительского контейнера
   const container = img.parentElement;
   if (container) {
     container.style.width = displayWidth + 'px';
     container.style.height = displayHeight + 'px';
   }
+  
+  return { oldWidth, oldHeight, displayWidth, displayHeight };
 }
 
-// Применяем зум ко всем изображениям
-function applyZoomToAll() {
-  const baseWidth = getBaseWidth();
-  const displayWidth = Math.floor(baseWidth * zoom);
-  
-  images.forEach(img => {
-    if (img && img.naturalWidth) {
-      const naturalWidth = img.naturalWidth;
-      const naturalHeight = img.naturalHeight;
-      const scale = displayWidth / naturalWidth;
-      const displayHeight = Math.floor(naturalHeight * scale);
-      
-      img.style.width = displayWidth + 'px';
-      img.style.height = displayHeight + 'px';
-      
-      const container = img.parentElement;
-      if (container) {
-        container.style.width = displayWidth + 'px';
-        container.style.height = displayHeight + 'px';
+// Применяем зум ко всем изображениям с сохранением позиции
+function applyZoomToAll(preserveScrollPosition = true) {
+  if (preserveScrollPosition) {
+    // Сохраняем текущую видимую область
+    const scrollTop = wrapper.scrollTop;
+    const scrollLeft = wrapper.scrollLeft;
+    const centerElement = getElementAtCenter();
+    
+    calculateBaseWidth();
+    const displayWidth = Math.floor(baseWidth * zoom);
+    
+    images.forEach((img, index) => {
+      if (img && img.naturalWidth) {
+        applyZoomToImage(img, true);
       }
-    }
-  });
+    });
+    
+    // Восстанавливаем позицию через requestAnimationFrame
+    requestAnimationFrame(() => {
+      if (centerElement) {
+        // Центрируем элемент, который был в центре
+        centerElement.scrollIntoView({ block: 'center', behavior: 'instant' });
+      } else {
+        // Или восстанавливаем позицию прокрутки
+        wrapper.scrollTop = scrollTop * (zoom / (zoom - ZOOM_STEP));
+      }
+    });
+  } else {
+    calculateBaseWidth();
+    images.forEach(img => {
+      if (img && img.naturalWidth) {
+        applyZoomToImage(img, false);
+      }
+    });
+  }
   
   showZoomIndicator();
 }
 
-// Изменение зума
-function changeZoom(delta) {
+// Получить элемент в центре экрана
+function getElementAtCenter() {
+  const wrapperRect = wrapper.getBoundingClientRect();
+  const centerY = wrapperRect.top + wrapperRect.height / 2;
+  
+  let closestElement = null;
+  let minDistance = Infinity;
+  
+  wrapper.querySelectorAll('.page-container').forEach(container => {
+    const rect = container.getBoundingClientRect();
+    const center = rect.top + rect.height / 2;
+    const distance = Math.abs(center - centerY);
+    
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestElement = container;
+    }
+  });
+  
+  return closestElement;
+}
+
+// Изменение зума с центрированием по точке
+function changeZoom(delta, centerX = null, centerY = null) {
   const newZoom = zoom + delta;
   
   if (newZoom < MIN_ZOOM || newZoom > MAX_ZOOM) {
     return;
   }
   
+  // Если есть точка центра (для тапа/щипка)
+  if (centerX !== null && centerY !== null && isMobile) {
+    zoomAtPoint(newZoom, centerX, centerY);
+    return;
+  }
+  
+  const oldZoom = zoom;
   zoom = Math.round(newZoom * 100) / 100;
   
-  // Сохраняем текущую позицию прокрутки
-  const scrollRatio = wrapper.scrollTop / (wrapper.scrollHeight - wrapper.clientHeight);
+  // Сохраняем текущий скролл перед изменением
+  const scrollTop = wrapper.scrollTop;
+  const scrollHeight = wrapper.scrollHeight;
+  const clientHeight = wrapper.clientHeight;
   
-  // Применяем зум
-  applyZoomToAll();
+  applyZoomToAll(true);
   
-  // Восстанавливаем позицию прокрутки
+  // Плавное восстановление позиции
   requestAnimationFrame(() => {
-    const newScrollTop = scrollRatio * (wrapper.scrollHeight - wrapper.clientHeight);
-    wrapper.scrollTop = newScrollTop;
+    const newScrollHeight = wrapper.scrollHeight;
+    if (scrollHeight > 0 && newScrollHeight > 0) {
+      const scrollRatio = scrollTop / scrollHeight;
+      wrapper.scrollTop = newScrollHeight * scrollRatio;
+    }
+  });
+}
+
+// Зум в конкретной точке (для мобильных)
+function zoomAtPoint(newZoom, centerX, centerY) {
+  const oldZoom = zoom;
+  
+  // Координаты относительно wrapper
+  const wrapperRect = wrapper.getBoundingClientRect();
+  const pointX = centerX - wrapperRect.left + wrapper.scrollLeft;
+  const pointY = centerY - wrapperRect.top + wrapper.scrollTop;
+  
+  // Сохраняем соотношение точки до зума
+  const pointRatioX = pointX / wrapper.scrollWidth;
+  const pointRatioY = pointY / wrapper.scrollHeight;
+  
+  zoom = Math.round(newZoom * 100) / 100;
+  applyZoomToAll(false);
+  
+  // Восстанавливаем позицию так, чтобы точка осталась на месте
+  requestAnimationFrame(() => {
+    const newScrollLeft = pointRatioX * wrapper.scrollWidth - (centerX - wrapperRect.left);
+    const newScrollTop = pointRatioY * wrapper.scrollHeight - (centerY - wrapperRect.top);
+    
+    wrapper.scrollTo({
+      left: Math.max(0, newScrollLeft),
+      top: Math.max(0, newScrollTop),
+      behavior: 'smooth'
+    });
   });
 }
 
@@ -272,7 +395,6 @@ function showZoomIndicator() {
    НАВИГАЦИЯ
 ====================================================== */
 
-// Получить текущую страницу
 function getCurrentPage() {
   const pageContainers = wrapper.querySelectorAll('.page-container');
   if (pageContainers.length === 0) return 1;
@@ -297,17 +419,15 @@ function getCurrentPage() {
   return currentPage;
 }
 
-// Обновить информацию о странице
 function updatePageInfo() {
   const current = getCurrentPage();
   pageInfo.textContent = `${current} / ${pages.length}`;
 }
 
 /* ======================================================
-   ОБРАБОТЧИКИ СОБЫТИЙ
+   ОБРАБОТЧИКИ СОБЫТИЙ (ИСПРАВЛЕННЫЕ)
 ====================================================== */
 
-// Настройка обработчиков
 function setupEventListeners() {
   // Кнопки зума
   document.getElementById('zoomIn').onclick = () => changeZoom(ZOOM_STEP);
@@ -322,19 +442,17 @@ function setupEventListeners() {
     wrapper.scrollTo({ top: wrapper.scrollHeight, behavior: 'smooth' });
   };
   
-  // Плавный скролл с оптимизацией
+  // Плавный скролл
   let scrollTimeout;
   wrapper.addEventListener('scroll', () => {
-    // Прогресс-бар
     const scrollHeight = wrapper.scrollHeight - wrapper.clientHeight;
     if (scrollHeight > 0) {
       const progress = (wrapper.scrollTop / scrollHeight) * 100;
       progressBar.style.width = progress + '%';
     }
     
-    // Обновление страницы с дебаунсом
     clearTimeout(scrollTimeout);
-    scrollTimeout = setTimeout(updatePageInfo, 100);
+    scrollTimeout = setTimeout(updatePageInfo, 50);
   }, { passive: true });
   
   // Ресайз окна
@@ -342,7 +460,8 @@ function setupEventListeners() {
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(() => {
-      applyZoomToAll();
+      calculateBaseWidth();
+      applyZoomToAll(false);
       updatePageInfo();
     }, 250);
   });
@@ -358,41 +477,97 @@ function setupEventListeners() {
   }
 }
 
-// Настройка тач-событий
+// Настройка тач-событий с зумом по точке
 function setupTouchEvents() {
-  // Двойной тап для зума
-  let lastTapTime = 0;
-  let tapCount = 0;
+  let touchStartDistance = 0;
+  let touchStartZoom = zoom;
+  let initialTouches = [];
   
+  // Двойной тап для зума в точке тапа
   wrapper.addEventListener('touchend', (e) => {
-    const currentTime = new Date().getTime();
-    const tapLength = currentTime - lastTapTime;
+    const currentTime = Date.now();
+    const touch = e.changedTouches[0];
     
-    if (tapLength < 300 && tapLength > 0) {
-      tapCount++;
+    if (currentTime - lastTap.time < 300 &&
+        Math.abs(touch.clientX - lastTap.x) < 50 &&
+        Math.abs(touch.clientY - lastTap.y) < 50) {
+      e.preventDefault();
       
-      if (tapCount === 2) {
-        e.preventDefault();
-        // Переключаем между 100% и 150%
-        if (Math.abs(zoom - 1.0) < 0.1) {
-          zoom = 1.5;
-        } else {
-          zoom = 1.0;
-        }
-        applyZoomToAll();
-        tapCount = 0;
+      // Переключаем между 100% и 150% с центрированием по точке тапа
+      if (Math.abs(zoom - 1.0) < 0.1) {
+        changeZoom(0.5, touch.clientX, touch.clientY);
+      } else {
+        changeZoom(-0.5, touch.clientX, touch.clientY);
       }
-    } else {
-      tapCount = 1;
     }
     
-    lastTapTime = currentTime;
+    lastTap = {
+      x: touch.clientX,
+      y: touch.clientY,
+      time: currentTime
+    };
   }, { passive: false });
+  
+  // Щипок для зума
+  wrapper.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      initialTouches = [e.touches[0], e.touches[1]];
+      touchStartDistance = getTouchDistance(initialTouches);
+      touchStartZoom = zoom;
+    }
+  }, { passive: true });
+  
+  wrapper.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      
+      const currentDistance = getTouchDistance(e.touches);
+      const centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      
+      const scale = currentDistance / touchStartDistance;
+      const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, touchStartZoom * scale));
+      
+      if (Math.abs(newZoom - zoom) > 0.05) {
+        zoom = newZoom;
+        applyZoomToAll(false);
+        
+        // Центрируем по средней точке щипка
+        const wrapperRect = wrapper.getBoundingClientRect();
+        const pointX = centerX - wrapperRect.left + wrapper.scrollLeft;
+        const pointY = centerY - wrapperRect.top + wrapper.scrollTop;
+        
+        const pointRatioX = pointX / wrapper.scrollWidth;
+        const pointRatioY = pointY / wrapper.scrollHeight;
+        
+        requestAnimationFrame(() => {
+          const newScrollLeft = pointRatioX * wrapper.scrollWidth - (centerX - wrapperRect.left);
+          const newScrollTop = pointRatioY * wrapper.scrollHeight - (centerY - wrapperRect.top);
+          
+          wrapper.scrollLeft = Math.max(0, newScrollLeft);
+          wrapper.scrollTop = Math.max(0, newScrollTop);
+        });
+      }
+    }
+  }, { passive: false });
+  
+  wrapper.addEventListener('touchend', () => {
+    if (initialTouches.length > 0) {
+      showZoomIndicator();
+      initialTouches = [];
+    }
+  }, { passive: true });
+}
+
+// Расстояние между двумя касаниями
+function getTouchDistance(touches) {
+  const dx = touches[0].clientX - touches[1].clientX;
+  const dy = touches[0].clientY - touches[1].clientY;
+  return Math.sqrt(dx * dx + dy * dy);
 }
 
 // Обработка клавиатуры
 function handleKeydown(e) {
-  // Зум с Ctrl/Cmd
   if (e.ctrlKey || e.metaKey) {
     if (e.key === '+' || e.key === '=') {
       e.preventDefault();
@@ -407,12 +582,11 @@ function handleKeydown(e) {
     if (e.key === '0') {
       e.preventDefault();
       zoom = 1.0;
-      applyZoomToAll();
+      applyZoomToAll(true);
       return;
     }
   }
   
-  // Навигация
   switch(e.key) {
     case 'ArrowDown':
     case 'PageDown':
@@ -452,21 +626,23 @@ document.addEventListener('DOMContentLoaded', () => {
   document.documentElement.style.overflow = 'hidden';
   document.body.style.overflow = 'hidden';
   
-  // Загружаем комикс и настраиваем события
+  // Фикс для кнопок
+  if (controlsWrapper) {
+    controlsWrapper.style.pointerEvents = 'auto';
+    controlsWrapper.style.opacity = '1';
+    controlsWrapper.style.visibility = 'visible';
+  }
+  
+  // Загружаем комикс
   loadComic().then(() => {
     setupEventListeners();
-    
-    // Принудительно показываем кнопки
-    const controls = document.querySelector('.controls');
-    const progress = document.querySelector('.progress');
-    if (controls) controls.style.opacity = '1';
-    if (progress) progress.style.opacity = '1';
   });
   
   // Ресайз при повороте
   window.addEventListener('orientationchange', () => {
     setTimeout(() => {
-      applyZoomToAll();
+      calculateBaseWidth();
+      applyZoomToAll(false);
     }, 300);
   });
 });
@@ -474,7 +650,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // Фикс после полной загрузки
 window.addEventListener('load', () => {
   setTimeout(() => {
-    applyZoomToAll();
+    calculateBaseWidth();
+    applyZoomToAll(false);
   }, 100);
 });
 </script>
