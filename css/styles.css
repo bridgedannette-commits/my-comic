@@ -35,6 +35,7 @@ html, body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
+
 /* Контейнер для canvas */
 .canvas-wrapper {
   flex: 1;
@@ -386,6 +387,11 @@ button:active {
   max-width: 100%;
   height: auto;
   display: block;
+}
+
+.comic-canvas {
+  width: 100%;
+  max-width: 100vw;
 }
 
 
