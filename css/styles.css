@@ -261,7 +261,7 @@ canvas:active {
 
 /* Навигационная панель */
 .controls {
-  background: rgba(15, 15, 15, 0.85);
+  background: rgba(15, 15, 15, 0.8);
   display: flex;
   justify-content: center;
   gap: 15px;
@@ -419,7 +419,7 @@ button:active {
   }
   
   .header {
-    padding: 12px 15px;
+    padding: 10px !important;
     min-height: 50px;
   }
   
@@ -484,7 +484,7 @@ button:active {
     padding: 10px 0 !important;
     gap: 8px !important;
     min-height: 50px !important;
-    background: rgba(10, 10, 10, 0.95) !important;
+    background: rgba(10, 10, 10, 0.8) !important;
     display: flex !important;
   }
   
