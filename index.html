@@ -1,57 +1,34 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Комикс</title>
-    <link rel="stylesheet" href="css/styles.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    <style>
-        /* Быстрый стиль для индикатора загрузки, пока грузится основной CSS */
-        body {
-            margin: 0;
-            padding: 0;
-            background: #000;
-            overflow: hidden;
-            font-family: 'Inter', sans-serif;
-            -webkit-tap-highlight-color: transparent;
-        }
-        
-        .comic-reader {
-            width: 100vw;
-            height: 100vh;
-            background: #111;
-            position: fixed;
-            top: 0;
-            left: 0;
-        }
-        
-        .canvas-wrapper {
-            width: 100%;
-            height: 100%;
-            overflow-y: auto;
-            background: #111;
-        }
-    </style>
-</head>
-<body>
-<div class="comic-reader" id="reader">
-  <div class="canvas-wrapper" id="canvasWrapper"></div>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Комикс</title>
 
-  <!-- Индикатор масштаба над панелью -->
+<link rel="stylesheet" href="css/styles.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+<div class="comic-reader" id="reader">
+  <div class="canvas-wrapper" id="canvasWrapper">
+    <div class="comic-canvas" id="comicCanvas"></div>
+  </div>
+
   <div class="zoom-indicator" id="zoomIndicator">
     <span id="zoomPercent">100%</span>
   </div>
 
   <div class="controls-wrapper">
-    <div class="controls" id="controls">
-      <button id="toTop" title="В начало" class="nav-btn">▲</button>
-      <button id="zoomOut" title="Уменьшить" class="zoom-btn">−</button>
+    <div class="controls">
+      <button id="toTop">▲</button>
+      <button id="zoomOut">−</button>
       <span id="pageInfo">– / –</span>
-      <button id="zoomIn" title="Увеличить" class="zoom-btn">+</button>
-      <button id="toBottom" title="В конец" class="nav-btn">▼</button>
+      <button id="zoomIn">+</button>
+      <button id="toBottom">▼</button>
     </div>
   </div>
 
@@ -60,480 +37,127 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
-// Устанавливаем worker
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+/* ================= НАСТРОЙКИ ================= */
 
-const PDF_URL = "https://bridgedannette-commits.github.io/my-comic/comics/mycomic.pdf";
+const IMAGES_PATH = 'https://bridgedannette-commits.github.io/my-comic/comics/test/';
+const IMAGE_COUNT = 10; // ← количество страниц
 
-let pdfDoc = null;
-let zoom = 1.0;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3.0;
 const ZOOM_STEP = 0.2;
 
-let currentRenderId = 0;
-let zoomIndicatorTimeout = null;
-let isRendering = false;
+/* ================= СОСТОЯНИЕ ================= */
 
-const wrapper = document.getElementById("canvasWrapper");
-const pageInfo = document.getElementById("pageInfo");
-const progressBar = document.getElementById("progressBar");
-const zoomIndicator = document.getElementById("zoomIndicator");
-const zoomPercent = document.getElementById("zoomPercent");
-const zoomInBtn = document.getElementById("zoomIn");
-const zoomOutBtn = document.getElementById("zoomOut");
-const toTopBtn = document.getElementById("toTop");
-const toBottomBtn = document.getElementById("toBottom");
-const reader = document.getElementById("reader");
+let zoom = 1;
 
-const canvases = [];
+const wrapper = document.getElementById('canvasWrapper');
+const canvas = document.getElementById('comicCanvas');
+const pageInfo = document.getElementById('pageInfo');
+const progressBar = document.getElementById('progressBar');
+const zoomIndicator = document.getElementById('zoomIndicator');
+const zoomPercent = document.getElementById('zoomPercent');
 
-// Определяем мобильное устройство
-const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth <= 768;
-const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-const isAndroid = /Android/i.test(navigator.userAgent);
+/* ================= ЗАГРУЗКА КОМИКСА ================= */
 
-// Инициализация PDF
-async function initPDF() {
-  try {
-    wrapper.innerHTML = '<div style="color: #ccc; text-align: center; padding: 50px; font-size: 16px; font-family: \'Inter\', sans-serif;">Загрузка комикса...</div>';
-    
-    // Гарантируем видимость элементов на мобильных сразу
-    if (isMobile) {
-      document.querySelector('.controls').style.opacity = '1';
-      document.querySelector('.progress').style.opacity = '1';
-    }
-    
-    pdfDoc = await pdfjsLib.getDocument(PDF_URL).promise;
-    
-    wrapper.innerHTML = '';
-    
-    pageInfo.textContent = `1 / ${pdfDoc.numPages}`;
-    
-    for (let i = 1; i <= pdfDoc.numPages; i++) {
-      const canvas = document.createElement("canvas");
-      canvas.id = `page-${i}`;
-      canvas.className = 'pdf-page';
-      wrapper.appendChild(canvas);
-      canvases.push(canvas);
-    }
-    
-    setupEventListeners();
-    
-    // На мобильных сразу рендерим
-    if (isMobile) {
-      await renderAllPages();
-    }
-    
-  } catch (error) {
-    console.error("Ошибка загрузки PDF:", error);
-    wrapper.innerHTML = '<div style="color: #fff; text-align: center; padding: 50px; font-size: 16px; font-family: \'Inter\', sans-serif;">Ошибка загрузки комикса</div>';
+function loadComic() {
+  canvas.innerHTML = '';
+
+  for (let i = 1; i <= IMAGE_COUNT; i++) {
+    const page = document.createElement('div');
+    page.className = 'comic-page';
+
+    const img = document.createElement('img');
+    img.src = `${IMAGES_PATH}${i}.jpg`;
+    img.loading = 'lazy';
+    img.draggable = false;
+
+    page.appendChild(img);
+    canvas.appendChild(page);
   }
+
+  updatePageInfo();
 }
 
-// Получаем целевую ширину - оптимизировано для мобильных
-function getTargetWidth() {
-    if (isMobile) {
-        // На мобильных используем почти всю ширину экрана
-        return Math.min(800, window.innerWidth * 0.95);
-    }
-    return Math.min(600, window.innerWidth * 0.9);
-}
+loadComic();
 
-// Рендерим одну страницу
-async function renderPage(pageNum, renderId) {
-  if (!pdfDoc || renderId !== currentRenderId) return;
-  
-  try {
-    const page = await pdfDoc.getPage(pageNum);
-    const canvas = canvases[pageNum - 1];
-    const ctx = canvas.getContext("2d");
-    
-    // Получаем ориентацию страницы
-    const rotation = page.rotate || 0;
-    
-    // Для первой страницы всегда используем rotation = 0
-    const finalRotation = (pageNum === 1) ? 0 : rotation;
-    
-    const viewport = page.getViewport({ scale: 1, rotation: finalRotation });
-    const targetWidth = getTargetWidth();
-    const baseScale = targetWidth / viewport.width;
-    const finalScale = baseScale * zoom;
-    
-    const scaledViewport = page.getViewport({ 
-      scale: finalScale,
-      rotation: finalRotation 
-    });
-    
-    canvas.width = scaledViewport.width;
-    canvas.height = scaledViewport.height;
-    canvas.style.width = `${scaledViewport.width}px`;
-    canvas.style.height = `${scaledViewport.height}px`;
-    canvas.style.margin = '0 auto';
-    canvas.style.display = 'block';
-    
-    // Для iOS добавляем фикс для производительности
-    if (isIOS) {
-      canvas.style.imageRendering = '-webkit-optimize-contrast';
-    }
-    
-    const renderContext = {
-      canvasContext: ctx,
-      viewport: scaledViewport
-    };
-    
-    // Очищаем canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    await page.render(renderContext).promise;
-    
-    // Фикс для первой страницы на мобильных
-    if (pageNum === 1 && isMobile) {
-      setTimeout(() => {
-        if (renderId === currentRenderId) {
-          renderPage(1, renderId);
-        }
-      }, 100);
-    }
-    
-  } catch (error) {
-    console.log('Ошибка рендеринга страницы', pageNum, error);
-  }
-}
+/* ================= ZOOM ================= */
 
-// Рендерим все страницы
-async function renderAllPages() {
-  if (isRendering) return;
-  isRendering = true;
-  
-  currentRenderId++;
-  const renderId = currentRenderId;
-  
-  const promises = [];
-  
-  // На мобильных рендерим меньше страниц за раз для производительности
-  const renderLimit = isMobile ? Math.min(3, pdfDoc.numPages) : pdfDoc.numPages;
-  
-  for (let i = 1; i <= renderLimit; i++) {
-    promises.push(new Promise(resolve => {
-      setTimeout(async () => {
-        if (renderId === currentRenderId) {
-          await renderPage(i, renderId);
-        }
-        resolve();
-      }, i * (isMobile ? 50 : 10)); // Больше задержка на мобильных
-    }));
-  }
-  
-  await Promise.all(promises);
-  isRendering = false;
-  
-  // На мобильных рендерим остальные страницы в фоне
-  if (isMobile && renderLimit < pdfDoc.numPages) {
-    for (let i = renderLimit + 1; i <= pdfDoc.numPages; i++) {
-      setTimeout(async () => {
-        if (renderId === currentRenderId) {
-          await renderPage(i, renderId);
-        }
-      }, (i - renderLimit) * 100);
-    }
-  }
-}
+function applyZoom(delta) {
+  const next = zoom + delta;
+  if (next < MIN_ZOOM || next > MAX_ZOOM) return;
 
-// Показываем индикатор зума
-function showZoomIndicator() {
+  zoom = +next.toFixed(2);
+  canvas.style.transform = `scale(${zoom})`;
+
   zoomPercent.textContent = `${Math.round(zoom * 100)}%`;
   zoomIndicator.classList.add('visible');
-  
-  if (zoomIndicatorTimeout) {
-    clearTimeout(zoomIndicatorTimeout);
-  }
-  
-  zoomIndicatorTimeout = setTimeout(() => {
+
+  clearTimeout(zoomIndicator._t);
+  zoomIndicator._t = setTimeout(() => {
     zoomIndicator.classList.remove('visible');
   }, 1500);
 }
 
-// Применяем зум с оптимизацией для мобильных
-async function applyZoom(delta) {
-  const newZoom = zoom + delta;
-  
-  if (newZoom < MIN_ZOOM || newZoom > MAX_ZOOM) {
-    return;
-  }
-  
-  zoom = parseFloat(newZoom.toFixed(2));
-  showZoomIndicator();
-  
-  // На мобильных делаем задержку перед рендерингом
-  if (isMobile) {
-    setTimeout(async () => {
-      await renderAllPages();
-    }, 50);
-  } else {
-    await renderAllPages();
-  }
-}
+/* ================= ТЕКУЩАЯ СТРАНИЦА ================= */
 
-// Обновляем информацию о странице
-function updatePageInfo() {
-  if (!pdfDoc) return;
-  
-  const currentPage = getCurrentPage();
-  pageInfo.textContent = `${currentPage} / ${pdfDoc.numPages}`;
-}
-
-// Получаем текущую страницу
 function getCurrentPage() {
-  if (!pdfDoc || canvases.length === 0) return 1;
-  
+  const pages = canvas.querySelectorAll('.comic-page');
+  if (!pages.length) return 1;
+
   const wrapperRect = wrapper.getBoundingClientRect();
-  const wrapperCenter = wrapperRect.top + wrapperRect.height / 2;
-  
-  let currentPage = 1;
+  const center = wrapperRect.top + wrapperRect.height / 2;
+
+  let closest = 1;
   let minDistance = Infinity;
-  
-  for (let i = 0; i < canvases.length; i++) {
-    const canvas = canvases[i];
-    const rect = canvas.getBoundingClientRect();
-    
-    const canvasCenter = rect.top + rect.height / 2;
-    const distance = Math.abs(canvasCenter - wrapperCenter);
-    
+
+  pages.forEach((page, i) => {
+    const rect = page.getBoundingClientRect();
+    const pageCenter = rect.top + rect.height / 2;
+    const distance = Math.abs(pageCenter - center);
+
     if (distance < minDistance) {
       minDistance = distance;
-      currentPage = i + 1;
+      closest = i + 1;
     }
-  }
-  
-  return currentPage;
+  });
+
+  return closest;
 }
 
-// Прокрутка в начало
-function scrollToTop() {
-  wrapper.scrollTo({
-    top: 0,
-    behavior: 'smooth'
-  });
+function updatePageInfo() {
+  pageInfo.textContent = `${getCurrentPage()} / ${IMAGE_COUNT}`;
 }
 
-// Прокрутка в конец
-function scrollToBottom() {
-  wrapper.scrollTo({
-    top: wrapper.scrollHeight,
-    behavior: 'smooth'
-  });
-}
+/* ================= SCROLL ================= */
 
-// Настройка обработчиков событий с оптимизацией для мобильных
-function setupEventListeners() {
-  // Кнопки зума
-  zoomInBtn.onclick = () => applyZoom(ZOOM_STEP);
-  zoomOutBtn.onclick = () => applyZoom(-ZOOM_STEP);
-  
-  // Кнопки навигации
-  toTopBtn.onclick = scrollToTop;
-  toBottomBtn.onclick = scrollToBottom;
-  
-  // Оптимизированный скролл для мобильных
-  wrapper.addEventListener("scroll", () => {
-    const scrollTop = wrapper.scrollTop;
-    const scrollHeight = wrapper.scrollHeight - wrapper.clientHeight;
-    
-    if (scrollHeight > 0) {
-      const progress = (scrollTop / scrollHeight * 100);
-      progressBar.style.width = progress + "%";
-      progressBar.style.transition = 'width 0.1s ease';
-    }
-    
-    updatePageInfo();
-    
-    // На мобильных ленивая загрузка при скролле
-    if (isMobile) {
-      requestAnimationFrame(() => {
-        renderAllPages();
-      });
-    }
-  }, { passive: true });
-  
-  // Клавиатурные shortcuts (только для десктопа)
-  if (!isMobile) {
-    document.addEventListener('keydown', (e) => {
-      if (e.ctrlKey) {
-        if (e.key === '+' || e.key === '=') {
-          e.preventDefault();
-          applyZoom(ZOOM_STEP);
-          return;
-        }
-        if (e.key === '-') {
-          e.preventDefault();
-          applyZoom(-ZOOM_STEP);
-          return;
-        }
-      }
-      
-      switch(e.key) {
-        case 'ArrowDown':
-        case 'PageDown':
-        case ' ':
-          e.preventDefault();
-          wrapper.scrollBy({ top: wrapper.clientHeight * 0.8, behavior: 'smooth' });
-          break;
-        case 'ArrowUp':
-        case 'PageUp':
-          e.preventDefault();
-          wrapper.scrollBy({ top: -wrapper.clientHeight * 0.8, behavior: 'smooth' });
-          break;
-        case 'Home':
-          e.preventDefault();
-          scrollToTop();
-          break;
-        case 'End':
-          e.preventDefault();
-          scrollToBottom();
-          break;
-      }
-    });
+wrapper.addEventListener('scroll', () => {
+  const maxScroll = wrapper.scrollHeight - wrapper.clientHeight;
+  if (maxScroll > 0) {
+    progressBar.style.width = `${(wrapper.scrollTop / maxScroll) * 100}%`;
   }
-  
-  // Ресайз с дебаунсом
-  let resizeTimeout;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimeout);
-    resizeTimeout = setTimeout(async () => {
-      if (pdfDoc) {
-        await renderAllPages();
-        updatePageInfo();
-      }
-    }, isMobile ? 500 : 250); // Больше задержка на мобильных
-  });
-  
-  // Перетаскивание для десктопа
-  if (!isMobile) {
-    let isDragging = false;
-    let startY = 0;
-    let scrollTop = 0;
-    
-    wrapper.addEventListener('mousedown', (e) => {
-      isDragging = true;
-      startY = e.clientY;
-      scrollTop = wrapper.scrollTop;
-      wrapper.style.cursor = 'grabbing';
-    });
-    
-    document.addEventListener('mousemove', (e) => {
-      if (!isDragging) return;
-      const walk = (startY - e.clientY) * 2;
-      wrapper.scrollTop = scrollTop + walk;
-    });
-    
-    document.addEventListener('mouseup', () => {
-      isDragging = false;
-      wrapper.style.cursor = 'grab';
-    });
-  }
-  
-  // Тач события для мобильных
-  if (isMobile) {
-    let touchStartY = 0;
-    let touchStartScrollTop = 0;
-    let isTouchScrolling = false;
-    
-    wrapper.addEventListener('touchstart', (e) => {
-      if (e.touches.length === 1) {
-        touchStartY = e.touches[0].clientY;
-        touchStartScrollTop = wrapper.scrollTop;
-        isTouchScrolling = true;
-        wrapper.style.cursor = 'grabbing';
-        e.preventDefault();
-      }
-    }, { passive: false });
-    
-    wrapper.addEventListener('touchmove', (e) => {
-      if (!isTouchScrolling || e.touches.length !== 1) return;
-      const touchY = e.touches[0].clientY;
-      const walk = (touchStartY - touchY) * 1.5;
-      wrapper.scrollTop = touchStartScrollTop + walk;
-      e.preventDefault();
-    }, { passive: false });
-    
-    wrapper.addEventListener('touchend', () => {
-      isTouchScrolling = false;
-      wrapper.style.cursor = 'grab';
-    }, { passive: true });
-    
-    // Предотвращаем масштабирование при двойном тапе
-    let lastTap = 0;
-    wrapper.addEventListener('touchend', (e) => {
-      const currentTime = new Date().getTime();
-      const tapLength = currentTime - lastTap;
-      if (tapLength < 300 && tapLength > 0) {
-        e.preventDefault();
-      }
-      lastTap = currentTime;
-    }, { passive: false });
-  }
-}
+  updatePageInfo();
+}, { passive: true });
 
-// Инициализация при загрузке страницы
-document.addEventListener('DOMContentLoaded', function() {
-  // Фикс высоты для мобильных браузеров
-  const setFullHeight = () => {
-    if (isIOS) {
-      document.documentElement.style.height = '-webkit-fill-available';
-      reader.style.height = '-webkit-fill-available';
-    } else if (isAndroid) {
-      reader.style.height = '100dvh';
-    } else {
-      reader.style.height = '100vh';
-    }
-  };
-  
-  setFullHeight();
-  
-  // Блокируем скролл страницы
-  document.documentElement.style.overflow = 'hidden';
-  document.body.style.overflow = 'hidden';
-  
-  // Фикс для Safari
-  if (isIOS) {
-    document.body.style.webkitUserSelect = 'none';
-    document.body.style.webkitTouchCallout = 'none';
-  }
-  
-  // Инициализация PDF
-  initPDF();
-  
-  // Перерисовка при изменении ориентации
-  window.addEventListener('orientationchange', () => {
-    setTimeout(() => {
-      setFullHeight();
-      if (pdfDoc) {
-        renderAllPages();
-      }
-    }, 300);
-  });
-});
+/* ================= КНОПКИ ================= */
 
-// Фикс для полной загрузки
-window.addEventListener('load', function() {
-  // Принудительно устанавливаем комикс на весь экран
-  reader.style.width = '100vw';
-  reader.style.position = 'fixed';
-  reader.style.top = '0';
-  reader.style.left = '0';
-  reader.style.zIndex = '9999';
-  
-  // Рендерим заново после полной загрузки страницы
-  setTimeout(() => {
-    if (pdfDoc) {
-      renderAllPages();
-    }
-  }, 300);
+document.getElementById('zoomIn').onclick = () => applyZoom(ZOOM_STEP);
+document.getElementById('zoomOut').onclick = () => applyZoom(-ZOOM_STEP);
+
+document.getElementById('toTop').onclick = () => {
+  wrapper.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+document.getElementById('toBottom').onclick = () => {
+  wrapper.scrollTo({ top: wrapper.scrollHeight, behavior: 'smooth' });
+};
+
+/* ================= RESIZE ================= */
+
+window.addEventListener('resize', () => {
+  updatePageInfo();
 });
 </script>
+
 </body>
 </html>
