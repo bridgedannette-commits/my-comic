@@ -1,34 +1,30 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Комикс</title>
-
-<link rel="stylesheet" href="css/styles.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Комикс</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
-
 <body>
-
 <div class="comic-reader" id="reader">
-  <div class="canvas-wrapper" id="canvasWrapper">
-    <div class="comic-canvas" id="comicCanvas"></div>
-  </div>
+  <div class="canvas-wrapper" id="canvasWrapper"></div>
 
+  <!-- Индикатор масштаба над панелью -->
   <div class="zoom-indicator" id="zoomIndicator">
     <span id="zoomPercent">100%</span>
   </div>
 
   <div class="controls-wrapper">
-    <div class="controls">
-      <button id="toTop">▲</button>
-      <button id="zoomOut">−</button>
+    <div class="controls" id="controls">
+      <button id="toTop" title="В начало" class="nav-btn">▲</button>
+      <button id="zoomOut" title="Уменьшить" class="zoom-btn">−</button>
       <span id="pageInfo">– / –</span>
-      <button id="zoomIn">+</button>
-      <button id="toBottom">▼</button>
+      <button id="zoomIn" title="Увеличить" class="zoom-btn">+</button>
+      <button id="toBottom" title="В конец" class="nav-btn">▼</button>
     </div>
   </div>
 
@@ -38,126 +34,615 @@
 </div>
 
 <script>
-/* ================= НАСТРОЙКИ ================= */
+// === КОНФИГУРАЦИЯ ===
+const IMAGES_BASE_URL = "comics/my-comic"; // Папка с изображениями
+const IMAGE_NAME_PATTERN = "p{page}.{ext}"; // p1.png, p2.webp и т.д.
+const FIRST_PAGE = 1;
+const LAST_PAGE = 2; // Измените на реальное количество страниц
+const SUPPORTED_FORMATS = ["png", "jpg", "jpeg", "webp", "gif"];
 
-const IMAGES_PATH = 'https://bridgedannette-commits.github.io/my-comic/comics/test/';
-const IMAGE_COUNT = 10; // ← количество страниц
-
+// === ПЕРЕМЕННЫЕ ===
+let zoom = 1.0;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3.0;
 const ZOOM_STEP = 0.2;
 
-/* ================= СОСТОЯНИЕ ================= */
+let totalPages = 0;
+let currentPage = 1;
+let isLoading = false;
+let zoomIndicatorTimeout = null;
 
-let zoom = 1;
+// DOM элементы
+const wrapper = document.getElementById("canvasWrapper");
+const pageInfo = document.getElementById("pageInfo");
+const progressBar = document.getElementById("progressBar");
+const zoomIndicator = document.getElementById("zoomIndicator");
+const zoomPercent = document.getElementById("zoomPercent");
+const zoomInBtn = document.getElementById("zoomIn");
+const zoomOutBtn = document.getElementById("zoomOut");
+const toTopBtn = document.getElementById("toTop");
+const toBottomBtn = document.getElementById("toBottom");
 
-const wrapper = document.getElementById('canvasWrapper');
-const canvas = document.getElementById('comicCanvas');
-const pageInfo = document.getElementById('pageInfo');
-const progressBar = document.getElementById('progressBar');
-const zoomIndicator = document.getElementById('zoomIndicator');
-const zoomPercent = document.getElementById('zoomPercent');
+const pageContainers = [];
+const images = [];
 
-/* ================= ЗАГРУЗКА КОМИКСА ================= */
+// Определяем мобильное устройство
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth <= 768;
+const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+const isAndroid = /Android/i.test(navigator.userAgent);
 
-function loadComic() {
-  canvas.innerHTML = '';
-
-  for (let i = 1; i <= IMAGE_COUNT; i++) {
-    const page = document.createElement('div');
-    page.className = 'comic-page';
-
-    const img = document.createElement('img');
-    img.src = `${IMAGES_PATH}${i}.jpg`;
-    img.loading = 'lazy';
-    img.draggable = false;
-
-    page.appendChild(img);
-    canvas.appendChild(page);
+// === ИНИЦИАЛИЗАЦИЯ ===
+async function initComic() {
+  try {
+    // Показываем индикатор загрузки
+    wrapper.innerHTML = '<div class="loading-indicator">Загрузка комикса...</div>';
+    
+    // Определяем количество страниц
+    totalPages = await detectTotalPages();
+    
+    if (totalPages === 0) {
+      throw new Error("Страницы не найдены");
+    }
+    
+    // Инициализируем интерфейс
+    pageInfo.textContent = `1 / ${totalPages}`;
+    wrapper.innerHTML = '';
+    
+    // Создаем контейнеры для всех страниц
+    for (let i = 1; i <= totalPages; i++) {
+      createPageContainer(i);
+    }
+    
+    setupEventListeners();
+    
+    // Загружаем первые несколько страниц
+    await loadVisiblePages();
+    
+    // Если мобильное устройство - загружаем остальные в фоне
+    if (isMobile) {
+      setTimeout(() => loadAllPages(), 500);
+    }
+    
+  } catch (error) {
+    console.error("Ошибка загрузки комикса:", error);
+    wrapper.innerHTML = '<div class="error-message">Ошибка загрузки комикса</div>';
   }
+}
 
+// Определяем количество страниц
+async function detectTotalPages() {
+  // Если задан LAST_PAGE, используем его
+  if (LAST_PAGE && LAST_PAGE > 0) {
+    return LAST_PAGE;
+  }
+  
+  // Иначе пытаемся определить автоматически
+  let page = FIRST_PAGE;
+  let foundPages = 0;
+  
+  // Проверяем первые 1000 страниц
+  while (page <= 1000) {
+    const found = await checkPageExists(page);
+    if (found) {
+      foundPages = page;
+      page++;
+    } else {
+      // Делаем еще одну попытку с другим расширением
+      const alternativeFound = await checkAlternativeFormats(page);
+      if (!alternativeFound) {
+        break;
+      }
+      foundPages = page;
+      page++;
+    }
+  }
+  
+  return foundPages;
+}
+
+// Проверяем существование страницы
+async function checkPageExists(pageNum) {
+  // Пробуем все поддерживаемые форматы
+  for (const format of SUPPORTED_FORMATS) {
+    const url = getImageUrl(pageNum, format);
+    try {
+      const response = await fetch(url, { method: 'HEAD' });
+      if (response.ok) {
+        return { exists: true, format: format };
+      }
+    } catch (e) {
+      // Продолжаем пробовать другие форматы
+    }
+  }
+  return { exists: false, format: null };
+}
+
+// Пробуем альтернативные форматы
+async function checkAlternativeFormats(pageNum) {
+  const formats = ['png', 'jpg', 'webp', 'jpeg', 'gif'];
+  for (const format of formats) {
+    const url = getImageUrl(pageNum, format);
+    try {
+      const response = await fetch(url, { method: 'HEAD' });
+      if (response.ok) {
+        return { exists: true, format: format };
+      }
+    } catch (e) {
+      // Игнорируем ошибки
+    }
+  }
+  return { exists: false, format: null };
+}
+
+// Создаем контейнер для страницы
+function createPageContainer(pageNum) {
+  const container = document.createElement('div');
+  container.className = 'page-container';
+  container.id = `page-${pageNum}`;
+  container.dataset.page = pageNum;
+  
+  const img = document.createElement('img');
+  img.className = 'comic-image';
+  img.id = `image-${pageNum}`;
+  img.alt = `Страница ${pageNum}`;
+  img.loading = 'lazy';
+  img.dataset.loaded = 'false';
+  
+  // Для iOS оптимизация
+  if (isIOS) {
+    img.style.imageRendering = '-webkit-optimize-contrast';
+  }
+  
+  container.appendChild(img);
+  wrapper.appendChild(container);
+  
+  pageContainers[pageNum] = container;
+  images[pageNum] = img;
+  
+  return container;
+}
+
+// Получаем URL изображения
+function getImageUrl(pageNum, format = null) {
+  if (!format) {
+    // Пробуем определить формат по имени файла
+    const fileName = IMAGE_NAME_PATTERN
+      .replace('{page}', pageNum)
+      .replace('{ext}', 'png'); // По умолчанию png
+    return `${IMAGES_BASE_URL}/${fileName}`;
+  }
+  
+  const fileName = IMAGE_NAME_PATTERN
+    .replace('{page}', pageNum)
+    .replace('{ext}', format);
+  return `${IMAGES_BASE_URL}/${fileName}`;
+}
+
+// Загружаем страницу
+async function loadPage(pageNum) {
+  if (pageNum < 1 || pageNum > totalPages) return;
+  
+  const img = images[pageNum];
+  if (!img || img.dataset.loaded === 'true') return;
+  
+  try {
+    // Сначала пробуем определить существующий формат
+    const checkResult = await checkPageExists(pageNum);
+    if (!checkResult.exists) {
+      console.warn(`Страница ${pageNum} не найдена`);
+      return;
+    }
+    
+    const url = getImageUrl(pageNum, checkResult.format);
+    img.dataset.format = checkResult.format;
+    
+    // Проверяем, является ли изображение анимированным
+    if (checkResult.format === 'webp' || checkResult.format === 'gif') {
+      img.dataset.animated = 'true';
+      img.classList.add('animated-page');
+    }
+    
+    // Загружаем изображение
+    await new Promise((resolve, reject) => {
+      img.onload = () => {
+        img.dataset.loaded = 'true';
+        applyZoomToImage(img);
+        resolve();
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+    
+  } catch (error) {
+    console.error(`Ошибка загрузки страницы ${pageNum}:`, error);
+    img.dataset.error = 'true';
+    img.alt = `Ошибка загрузки страницы ${pageNum}`;
+  }
+}
+
+// Загружаем видимые страницы
+async function loadVisiblePages() {
+  const visiblePages = getVisiblePageNumbers();
+  const loadPromises = [];
+  
+  visiblePages.forEach(pageNum => {
+    if (pageNum >= 1 && pageNum <= totalPages) {
+      loadPromises.push(loadPage(pageNum));
+    }
+  });
+  
+  // Также загружаем соседние страницы
+  const current = getCurrentPage();
+  const preloadPages = [current - 1, current + 1];
+  preloadPages.forEach(pageNum => {
+    if (pageNum >= 1 && pageNum <= totalPages && 
+        !visiblePages.includes(pageNum)) {
+      loadPromises.push(loadPage(pageNum));
+    }
+  });
+  
+  await Promise.all(loadPromises);
+}
+
+// Загружаем все страницы (для фоновой загрузки)
+async function loadAllPages() {
+  if (isLoading) return;
+  isLoading = true;
+  
+  for (let i = 1; i <= totalPages; i++) {
+    if (images[i] && images[i].dataset.loaded !== 'true') {
+      await loadPage(i);
+      // На мобильных делаем паузу между загрузками
+      if (isMobile) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    }
+  }
+  
+  isLoading = false;
+}
+
+// Получаем номера видимых страниц
+function getVisiblePageNumbers() {
+  const result = [];
+  const wrapperRect = wrapper.getBoundingClientRect();
+  
+  for (let i = 1; i <= totalPages; i++) {
+    const container = pageContainers[i];
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      if (rect.top < wrapperRect.bottom && rect.bottom > wrapperRect.top) {
+        result.push(i);
+      }
+    }
+  }
+  
+  return result;
+}
+
+// Получаем текущую страницу
+function getCurrentPage() {
+  const wrapperRect = wrapper.getBoundingClientRect();
+  const wrapperCenter = wrapperRect.top + wrapperRect.height / 2;
+  
+  let currentPage = 1;
+  let minDistance = Infinity;
+  
+  for (let i = 1; i <= totalPages; i++) {
+    const container = pageContainers[i];
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      const containerCenter = rect.top + rect.height / 2;
+      const distance = Math.abs(containerCenter - wrapperCenter);
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        currentPage = i;
+      }
+    }
+  }
+  
+  return currentPage;
+}
+
+// === МАСШТАБИРОВАНИЕ ===
+// Применяем зум ко всем страницам одновременно
+function applyZoomToAllPages() {
+  if (!pageContainers[1]) return;
+  
+  // Получаем базовую ширину
+  const baseWidth = getBaseWidth();
+  
+  // Применяем ко всем загруженным изображениям
+  for (let i = 1; i <= totalPages; i++) {
+    const img = images[i];
+    if (img && img.dataset.loaded === 'true') {
+      applyZoomToImage(img, baseWidth);
+    }
+  }
+  
+  // Обновляем индикатор
+  showZoomIndicator();
+}
+
+// Применяем зум к конкретному изображению
+function applyZoomToImage(img, baseWidth = null) {
+  if (!baseWidth) {
+    baseWidth = getBaseWidth();
+  }
+  
+  const container = img.parentElement;
+  const naturalWidth = img.naturalWidth || 1;
+  const naturalHeight = img.naturalHeight || 1;
+  
+  // Вычисляем новые размеры с учетом зума
+  const displayWidth = Math.min(baseWidth * zoom, window.innerWidth * 0.95);
+  const scaleFactor = displayWidth / naturalWidth;
+  const displayHeight = naturalHeight * scaleFactor;
+  
+  // Устанавливаем размеры
+  img.style.width = `${displayWidth}px`;
+  img.style.height = `${displayHeight}px`;
+  
+  // Устанавливаем размеры контейнера
+  container.style.width = `${displayWidth}px`;
+  container.style.height = `${displayHeight}px`;
+  
+  // Принудительный reflow для предотвращения "плывучести"
+  container.offsetHeight;
+}
+
+// Получаем базовую ширину
+function getBaseWidth() {
+  if (isMobile) {
+    return Math.min(800, window.innerWidth * 0.95);
+  }
+  return Math.min(600, window.innerWidth * 0.9);
+}
+
+// Изменяем масштаб
+function changeZoom(delta) {
+  const newZoom = zoom + delta;
+  
+  if (newZoom < MIN_ZOOM || newZoom > MAX_ZOOM) {
+    return;
+  }
+  
+  zoom = parseFloat(newZoom.toFixed(2));
+  
+  // Применяем зум ко всем страницам
+  applyZoomToAllPages();
+  
+  // Обновляем информацию о текущей странице
   updatePageInfo();
 }
 
-loadComic();
-
-/* ================= ZOOM ================= */
-
-function applyZoom(delta) {
-  const next = zoom + delta;
-  if (next < MIN_ZOOM || next > MAX_ZOOM) return;
-
-  zoom = +next.toFixed(2);
-  canvas.style.transform = `scale(${zoom})`;
-
+// Показываем индикатор зума
+function showZoomIndicator() {
   zoomPercent.textContent = `${Math.round(zoom * 100)}%`;
   zoomIndicator.classList.add('visible');
-
-  clearTimeout(zoomIndicator._t);
-  zoomIndicator._t = setTimeout(() => {
+  
+  if (zoomIndicatorTimeout) {
+    clearTimeout(zoomIndicatorTimeout);
+  }
+  
+  zoomIndicatorTimeout = setTimeout(() => {
     zoomIndicator.classList.remove('visible');
   }, 1500);
 }
 
-/* ================= ТЕКУЩАЯ СТРАНИЦА ================= */
-
-function getCurrentPage() {
-  const pages = canvas.querySelectorAll('.comic-page');
-  if (!pages.length) return 1;
-
-  const wrapperRect = wrapper.getBoundingClientRect();
-  const center = wrapperRect.top + wrapperRect.height / 2;
-
-  let closest = 1;
-  let minDistance = Infinity;
-
-  pages.forEach((page, i) => {
-    const rect = page.getBoundingClientRect();
-    const pageCenter = rect.top + rect.height / 2;
-    const distance = Math.abs(pageCenter - center);
-
-    if (distance < minDistance) {
-      minDistance = distance;
-      closest = i + 1;
-    }
-  });
-
-  return closest;
-}
-
+// === НАВИГАЦИЯ ===
 function updatePageInfo() {
-  pageInfo.textContent = `${getCurrentPage()} / ${IMAGE_COUNT}`;
+  currentPage = getCurrentPage();
+  pageInfo.textContent = `${currentPage} / ${totalPages}`;
 }
 
-/* ================= SCROLL ================= */
+function scrollToTop() {
+  wrapper.scrollTo({
+    top: 0,
+    behavior: 'smooth'
+  });
+}
 
-wrapper.addEventListener('scroll', () => {
-  const maxScroll = wrapper.scrollHeight - wrapper.clientHeight;
-  if (maxScroll > 0) {
-    progressBar.style.width = `${(wrapper.scrollTop / maxScroll) * 100}%`;
+function scrollToBottom() {
+  wrapper.scrollTo({
+    top: wrapper.scrollHeight,
+    behavior: 'smooth'
+  });
+}
+
+function scrollToPage(pageNum) {
+  const container = pageContainers[pageNum];
+  if (container) {
+    container.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center'
+    });
   }
-  updatePageInfo();
-}, { passive: true });
+}
 
-/* ================= КНОПКИ ================= */
+// === ОБРАБОТЧИКИ СОБЫТИЙ ===
+function setupEventListeners() {
+  // Кнопки зума
+  zoomInBtn.onclick = () => changeZoom(ZOOM_STEP);
+  zoomOutBtn.onclick = () => changeZoom(-ZOOM_STEP);
+  
+  // Кнопки навигации
+  toTopBtn.onclick = scrollToTop;
+  toBottomBtn.onclick = scrollToBottom;
+  
+  // Скролл
+  let scrollTimeout;
+  wrapper.addEventListener("scroll", () => {
+    // Прогресс бар
+    const scrollTop = wrapper.scrollTop;
+    const scrollHeight = wrapper.scrollHeight - wrapper.clientHeight;
+    
+    if (scrollHeight > 0) {
+      const progress = (scrollTop / scrollHeight * 100);
+      progressBar.style.width = progress + "%";
+    }
+    
+    // Обновление информации о странице
+    updatePageInfo();
+    
+    // Ленивая загрузка с дебаунсом
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+      loadVisiblePages();
+    }, 100);
+  }, { passive: true });
+  
+  // Ресайз окна
+  let resizeTimeout;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      // Пересчитываем размеры всех загруженных страниц
+      applyZoomToAllPages();
+      updatePageInfo();
+    }, 250);
+  });
+  
+  // Клавиатурные сокращения (только для десктопа)
+  if (!isMobile) {
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === '+' || e.key === '=') {
+          e.preventDefault();
+          changeZoom(ZOOM_STEP);
+          return;
+        }
+        if (e.key === '-') {
+          e.preventDefault();
+          changeZoom(-ZOOM_STEP);
+          return;
+        }
+        if (e.key === '0') {
+          e.preventDefault();
+          zoom = 1.0;
+          applyZoomToAllPages();
+          return;
+        }
+      }
+      
+      switch(e.key) {
+        case 'ArrowDown':
+        case 'PageDown':
+        case ' ':
+          e.preventDefault();
+          wrapper.scrollBy({ top: wrapper.clientHeight * 0.8, behavior: 'smooth' });
+          break;
+        case 'ArrowUp':
+        case 'PageUp':
+          e.preventDefault();
+          wrapper.scrollBy({ top: -wrapper.clientHeight * 0.8, behavior: 'smooth' });
+          break;
+        case 'Home':
+          e.preventDefault();
+          scrollToTop();
+          break;
+        case 'End':
+          e.preventDefault();
+          scrollToBottom();
+          break;
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            const percent = parseInt(e.key) * 10;
+            scrollToPage(Math.floor(totalPages * percent / 100));
+          }
+          break;
+      }
+    });
+  }
+  
+  // Тач события для мобильных
+  if (isMobile) {
+    // Двойной тап для зума
+    let lastTap = 0;
+    wrapper.addEventListener('touchend', (e) => {
+      const currentTime = new Date().getTime();
+      const tapLength = currentTime - lastTap;
+      
+      if (tapLength < 300 && tapLength > 0) {
+        e.preventDefault();
+        // Переключаем между 100% и 150%
+        if (zoom === 1.0) {
+          zoom = 1.5;
+        } else {
+          zoom = 1.0;
+        }
+        applyZoomToAllPages();
+      }
+      
+      lastTap = currentTime;
+    });
+  }
+}
 
-document.getElementById('zoomIn').onclick = () => applyZoom(ZOOM_STEP);
-document.getElementById('zoomOut').onclick = () => applyZoom(-ZOOM_STEP);
+// === ИНИЦИАЛИЗАЦИЯ ПРИ ЗАГРУЗКЕ ===
+document.addEventListener('DOMContentLoaded', function() {
+  // Фикс высоты для мобильных браузеров
+  const setFullHeight = () => {
+    if (isIOS) {
+      document.documentElement.style.height = '-webkit-fill-available';
+      document.getElementById('reader').style.height = '-webkit-fill-available';
+    } else if (isAndroid) {
+      document.getElementById('reader').style.height = '100dvh';
+    } else {
+      document.getElementById('reader').style.height = '100vh';
+    }
+  };
+  
+  setFullHeight();
+  
+  // Блокируем скролл страницы
+  document.documentElement.style.overflow = 'hidden';
+  document.body.style.overflow = 'hidden';
+  
+  // Фикс для Safari
+  if (isIOS) {
+    document.body.style.webkitUserSelect = 'none';
+    document.body.style.webkitTouchCallout = 'none';
+  }
+  
+  // Инициализация комикса
+  initComic();
+  
+  // Перерисовка при изменении ориентации
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => {
+      setFullHeight();
+      applyZoomToAllPages();
+    }, 300);
+  });
+});
 
-document.getElementById('toTop').onclick = () => {
-  wrapper.scrollTo({ top: 0, behavior: 'smooth' });
-};
-
-document.getElementById('toBottom').onclick = () => {
-  wrapper.scrollTo({ top: wrapper.scrollHeight, behavior: 'smooth' });
-};
-
-/* ================= RESIZE ================= */
-
-window.addEventListener('resize', () => {
-  updatePageInfo();
+// Фикс для полной загрузки
+window.addEventListener('load', function() {
+  // Принудительно устанавливаем комикс на весь экран
+  const reader = document.getElementById('reader');
+  reader.style.width = '100vw';
+  reader.style.position = 'fixed';
+  reader.style.top = '0';
+  reader.style.left = '0';
+  reader.style.zIndex = '9999';
+  
+  // Перерисовываем после полной загрузки
+  setTimeout(() => {
+    applyZoomToAllPages();
+  }, 100);
 });
 </script>
-
 </body>
 </html>
