@@ -18,9 +18,7 @@
   <!-- Верхняя панель -->
   <div class="header-wrapper" id="headerWrapper">
     <div class="header">
-      <button class="header-btn" id="menuBtn">☰</button>
       <div class="comic-title" id="comicTitle">Мой Комикс</div>
-      <button class="header-btn" id="settingsBtn">⚙</button>
     </div>
   </div>
 
@@ -250,21 +248,6 @@ document.getElementById('toTop').onclick = () => {
 document.getElementById('toBottom').onclick = () => {
   wrapper.scrollTo({ top: wrapper.scrollHeight, behavior: 'smooth' });
   showPanels();
-};
-
-// Клик по кнопкам меню (пока заглушки)
-document.getElementById('menuBtn').onclick = (e) => {
-  e.stopPropagation();
-  showPanels();
-  // В будущем можно добавить функционал меню
-  alert('Меню (функционал в разработке)');
-};
-
-document.getElementById('settingsBtn').onclick = (e) => {
-  e.stopPropagation();
-  showPanels();
-  // В будущем можно добавить настройки
-  alert('Настройки (функционал в разработке)');
 };
 
 // Клик по области комикса показывает/скрывает панели
