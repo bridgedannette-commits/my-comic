@@ -378,3 +378,27 @@ button:active {
 .zoom-btn:hover::after {
   opacity: 1;
 }
+
+/* Добавьте это в конец файла css/styles.css */
+
+/* Исправление для перевернутого canvas */
+#reader canvas:first-child {
+  transform: none !important;
+}
+
+/* Отключаем все трансформации для canvas */
+canvas.pdf-page {
+  transform: none !important;
+  -webkit-transform: none !important;
+  -moz-transform: none !important;
+  -ms-transform: none !important;
+  -o-transform: none !important;
+}
+
+/* Гарантируем правильное отображение */
+canvas {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
