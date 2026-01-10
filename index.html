@@ -1,3 +1,4 @@
+```html
 <div class="comic-reader" id="reader">
   <div class="canvas-wrapper" id="canvasWrapper"></div>
 
@@ -36,6 +37,7 @@ html, body {
   height: 100%;
   overflow: hidden;
   background: #000;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
 .comic-reader {
@@ -54,6 +56,7 @@ html, body {
   flex-direction: column;
   border: none !important;
   isolation: isolate;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
 /* Контейнер для canvas должен центрировать комикс */
@@ -71,6 +74,13 @@ html, body {
   line-height: 0;
   width: 100%;
   height: 100%;
+  /* Убираем скроллбар */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.canvas-wrapper::-webkit-scrollbar {
+  display: none;
 }
 
 /* Canvas комикса остаётся прежнего размера */
@@ -120,6 +130,7 @@ canvas:active {
   border: 1px solid rgba(255, 165, 0, 0.3);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   pointer-events: none;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
 .zoom-indicator.visible {
@@ -162,6 +173,7 @@ canvas:active {
   border: 1px solid rgba(255, 255, 255, 0.1);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
 .nav-btn:hover {
@@ -185,6 +197,7 @@ canvas:active {
   font-weight: 300;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
 .zoom-btn:hover {
@@ -209,6 +222,7 @@ button {
   justify-content: center;
   position: relative;
   overflow: hidden;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
 button:hover {
@@ -232,9 +246,10 @@ button:active {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 165, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   margin: 0 10px;
   letter-spacing: 0.3px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
 /* Прогресс-бар над навигационной панелью */
@@ -352,34 +367,6 @@ button:active {
   }
 }
 
-/* Кастомный скроллбар - ОРАНЖЕВЫЙ ГРАДИЕНТ */
-.canvas-wrapper::-webkit-scrollbar {
-  width: 10px;
-}
-
-.canvas-wrapper::-webkit-scrollbar-track {
-  background: rgba(30, 30, 30, 0.8);
-  border-radius: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.canvas-wrapper::-webkit-scrollbar-thumb {
-  background: linear-gradient(to bottom, #FF8C00, #FFA500);
-  border-radius: 5px;
-  border: 1px solid rgba(255, 140, 0, 0.3);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
-
-.canvas-wrapper::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(to bottom, #FFA500, #FFB732);
-  border-color: rgba(255, 165, 0, 0.5);
-}
-
-.canvas-wrapper {
-  scrollbar-width: thin;
-  scrollbar-color: #FFA500 rgba(30, 30, 30, 0.8);
-}
-
 /* Анимация для индикатора */
 @keyframes softPulse {
   0% { 
@@ -449,6 +436,11 @@ button:active {
 }
 </style>
 
+<!-- Подключаем современный шрифт без засечек -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
 // Устанавливаем worker
@@ -482,7 +474,7 @@ const canvases = [];
 // Инициализация PDF
 async function initPDF() {
   try {
-    wrapper.innerHTML = '<div style="color: #ccc; text-align: center; padding: 50px; font-size: 16px;">Загрузка комикса...</div>';
+    wrapper.innerHTML = '<div style="color: #ccc; text-align: center; padding: 50px; font-size: 16px; font-family: \'Inter\', sans-serif;">Загрузка комикса...</div>';
     
     pdfDoc = await pdfjsLib.getDocument(PDF_URL).promise;
     
@@ -507,7 +499,7 @@ async function initPDF() {
     
   } catch (error) {
     console.error("Ошибка загрузки PDF:", error);
-    wrapper.innerHTML = '<div style="color: #fff; text-align: center; padding: 50px; font-size: 16px;">Ошибка загрузки комикса</div>';
+    wrapper.innerHTML = '<div style="color: #fff; text-align: center; padding: 50px; font-size: 16px; font-family: \'Inter\', sans-serif;">Ошибка загрузки комикса</div>';
   }
 }
 
