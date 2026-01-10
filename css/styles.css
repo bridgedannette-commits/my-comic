@@ -117,7 +117,6 @@ canvas:active {
   width: 100%;
   pointer-events: auto;
   min-height: 60px;
-  border-bottom: 1px solid rgba(255, 165, 0, 0.15);
   z-index: 101;
   /* Убрали backdrop-filter - просто полупрозрачная панель */
 }
