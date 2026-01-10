@@ -97,6 +97,7 @@ function getTargetWidth() {
 }
 
 // Рендерим одну страницу
+// Рендерим одну страницу
 async function renderPage(pageNum, renderId) {
   if (!pdfDoc || renderId !== currentRenderId) return;
   
@@ -117,12 +118,38 @@ async function renderPage(pageNum, renderId) {
   canvas.style.height = `${scaledViewport.height}px`;
   canvas.style.margin = '0 auto';
   
+  // Проверяем ориентацию страницы
+  const rotation = page.rotate;
+  
   const renderContext = {
     canvasContext: ctx,
     viewport: scaledViewport
   };
   
-  await page.render(renderContext).promise;
+  // Если страница имеет поворот, применяем его
+  if (rotation === 90 || rotation === 270) {
+    // Для повернутых страниц меняем ширину и высоту
+    canvas.width = scaledViewport.height;
+    canvas.height = scaledViewport.width;
+    canvas.style.width = `${scaledViewport.height}px`;
+    canvas.style.height = `${scaledViewport.width}px`;
+    
+    // Поворачиваем контекст для отрисовки
+    ctx.save();
+    if (rotation === 90) {
+      ctx.translate(scaledViewport.height, 0);
+      ctx.rotate(Math.PI / 2);
+    } else if (rotation === 270) {
+      ctx.translate(0, scaledViewport.width);
+      ctx.rotate(-Math.PI / 2);
+    }
+    
+    await page.render(renderContext).promise;
+    ctx.restore();
+  } else {
+    // Обычная отрисовка без поворота
+    await page.render(renderContext).promise;
+  }
 }
 
 // Рендерим все страницы
