@@ -77,13 +77,6 @@ async function initPDF() {
       wrapper.appendChild(canvas);
       canvases.push(canvas);
     }
-    
-    await renderAllPages();
-    setTimeout(async () => {
-       if (pdfDoc) {
-           await renderPage(1, currentRenderId);
-    }
-}, 1000);
     setupEventListeners();
     
     // Устанавливаем комикс на всю страницу
@@ -103,6 +96,37 @@ function getTargetWidth() {
 
 // Рендерим одну страницу - ПРОСТАЯ ВЕРСИЯ КАК В РАБОЧЕМ КОДЕ
 // Рендерим одну страницу с фиксом для всех повернутых страниц
+// Рендерим все страницы
+async function renderAllPages() {
+  currentRenderId++;
+  
+  const renderId = currentRenderId;
+  const promises = [];
+  
+  // Рендерим все страницы параллельно
+  for (let i = 1; i <= pdfDoc.numPages; i++) {
+    promises.push(new Promise(resolve => {
+      setTimeout(async () => {
+        if (renderId === currentRenderId) {
+          await renderPage(i, renderId);
+          
+          // Если это первая страница, рендерим ее еще раз сразу
+          if (i === 1) {
+            await new Promise(r => setTimeout(r, 10)); // Маленькая пауза
+            if (renderId === currentRenderId) {
+              await renderPage(1, renderId);
+            }
+          }
+        }
+        resolve();
+      }, i * 10);
+    }));
+  }
+  
+  await Promise.all(promises);
+}
+
+// Функция рендеринга страницы
 async function renderPage(pageNum, renderId) {
   if (!pdfDoc || renderId !== currentRenderId) return;
   
@@ -110,16 +134,20 @@ async function renderPage(pageNum, renderId) {
   const canvas = canvases[pageNum - 1];
   const ctx = canvas.getContext("2d");
   
-  const viewport = page.getViewport({ scale: 1 });
+  // Получаем ориентацию страницы
+  const rotation = page.rotate || 0;
+  
+  // Для первой страницы всегда используем rotation = 0
+  const finalRotation = (pageNum === 1) ? 0 : rotation;
+  
+  const viewport = page.getViewport({ scale: 1, rotation: finalRotation });
   const targetWidth = getTargetWidth();
   const baseScale = targetWidth / viewport.width;
   const finalScale = baseScale * zoom;
   
-  // ВАЖНО: игнорируем rotation из PDF для всех страниц
-  // Принудительно ставим rotation = 0
   const scaledViewport = page.getViewport({ 
     scale: finalScale,
-    rotation: 0 // Всегда без поворота
+    rotation: finalRotation 
   });
   
   canvas.width = scaledViewport.width;
@@ -134,18 +162,13 @@ async function renderPage(pageNum, renderId) {
     viewport: scaledViewport
   };
   
-  // Очищаем canvas только если он уже был использован
-  if (canvas.width > 0 && canvas.height > 0) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  }
+  // Очищаем canvas
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   
   try {
     await page.render(renderContext).promise;
   } catch (error) {
-    if (error.message && error.message.includes('same canvas')) {
-      // Игнорируем эту ошибку - она возникает при быстром перерисовывании
-      console.log('Пропускаем рендеринг страницы', pageNum, 'из-за перезапуска');
-    }
+    // Игнорируем ошибки
   }
 }
 // Рендерим все страницы - ПАРАЛЛЕЛЬНО КАК В РАБОЧЕМ КОДЕ
