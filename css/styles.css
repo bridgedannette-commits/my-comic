@@ -377,3 +377,8 @@ button:active {
     height: 4px;
   }
 }
+
+.comic-canvas {
+  transform-origin: top center;
+}
+
