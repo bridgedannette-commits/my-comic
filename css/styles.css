@@ -97,6 +97,74 @@ canvas:active {
   cursor: grabbing;
 }
 
+/* ================= ВЕРХНЯЯ ПАНЕЛЬ ================= */
+.header-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 100;
+  pointer-events: auto !important;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.header {
+  background: rgba(15, 15, 15, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 20px;
+  width: 100%;
+  pointer-events: auto;
+  min-height: 60px;
+  border-bottom: 1px solid rgba(255, 165, 0, 0.1);
+  z-index: 101;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.comic-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  flex: 1;
+  text-align: center;
+  padding: 0 10px;
+}
+
+.header-btn {
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 14px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  border: none;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+
+.header-btn:hover {
+  background: rgba(255, 165, 0, 0.9);
+  color: #000;
+  transform: scale(1.1);
+}
+
+.header-btn:active {
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  transform: scale(0.95);
+}
+
 /* Обертка для навигационной панели - ИСПРАВЛЕНО */
 .controls-wrapper {
   position: absolute;
@@ -105,6 +173,58 @@ canvas:active {
   width: 100%;
   z-index: 100;
   pointer-events: auto !important; /* ВАЖНО: исправляем проблему с кнопками */
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+/* Стили для скрытых панелей */
+.header-wrapper.hidden {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.controls-wrapper.hidden {
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Стили для прогресс-бара */
+.progress {
+  position: fixed;
+  left: 0;
+  width: 100%;
+  height: 6px;
+  background: rgba(30, 30, 30, 0.9);
+  z-index: 99;
+  border-radius: 0;
+  margin: 0;
+  overflow: hidden;
+  border: none;
+  transition: bottom 0.3s ease;
+}
+
+/* Когда панели видны - прогресс-бар над ними */
+.panels-visible .progress {
+  bottom: 70px;
+}
+
+/* Когда панели скрыты - прогресс-бар в самом низу */
+.panels-hidden .progress {
+  bottom: 0;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, 
+    #FF8C00 0%, 
+    #FFA500 25%, 
+    #FFB732 50%, 
+    #FFC966 75%, 
+    #FFD700 100%);
+  transition: width 0.2s ease;
+  border-radius: 0;
 }
 
 /* Индикатор масштаба */
@@ -155,6 +275,8 @@ canvas:active {
   min-height: 70px;
   border-top: 1px solid rgba(255, 165, 0, 0.1);
   z-index: 101;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 /* Кнопки навигации в начало/конец - МЕНЬШЕЕ СВЕЧЕНИЕ */
@@ -285,45 +407,49 @@ button:active {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
-/* Прогресс-бар над навигационной панелью */
-.progress {
-  position: absolute;
-  bottom: 70px;
-  left: 0;
-  width: 100%;
-  height: 6px;
-  background: rgba(30, 30, 30, 0.9);
-  z-index: 101;
-  border-radius: 3px;
-  margin: 0;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-
-.progress-bar {
-  height: 100%;
-  width: 0%;
-  /* Яркий оранжево-желтый градиент */
-  background: linear-gradient(90deg, 
-    #FF8C00 0%, 
-    #FFA500 25%, 
-    #FFB732 50%, 
-    #FFC966 75%, 
-    #FFD700 100%);
-  transition: width 0.2s ease;
-  border-radius: 3px;
-}
-
 /* Адаптивность - ИСПРАВЛЕННАЯ ДЛЯ МОБИЛЬНЫХ */
 @media (max-width: 768px) {
   .comic-reader {
     height: 100vh !important;
   }
   
+  .header {
+    padding: 12px 15px;
+    min-height: 50px;
+  }
+  
+  .comic-title {
+    font-size: 16px;
+  }
+  
+  .header-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
+  }
+  
+  .panels-visible .progress {
+    bottom: 50px;
+  }
+  
+  .panels-hidden .progress {
+    bottom: 0;
+  }
+  
   /* Фикс для безопасных зон на iOS */
   @supports (padding-bottom: env(safe-area-inset-bottom)) {
     .comic-reader {
       padding-bottom: env(safe-area-inset-bottom);
+    }
+    
+    .header-wrapper {
+      position: fixed !important;
+      top: env(safe-area-inset-top, 0px) !important;
+      z-index: 10000 !important;
+    }
+    
+    .header {
+      padding-top: calc(12px + env(safe-area-inset-top, 0px)) !important;
     }
     
     .controls-wrapper {
@@ -333,9 +459,13 @@ button:active {
     }
     
     .progress {
+      bottom: env(safe-area-inset-bottom, 0px) !important;
       position: fixed !important;
-      bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
       z-index: 10000 !important;
+    }
+    
+    .panels-visible .progress {
+      bottom: calc(50px + env(safe-area-inset-bottom, 0px)) !important;
     }
     
     .zoom-indicator {
@@ -363,7 +493,7 @@ button:active {
     min-width: 80px !important;
   }
   
-  button, .nav-btn, .zoom-btn {
+  button, .nav-btn, .zoom-btn, .header-btn {
     min-width: 36px !important;
     height: 36px !important;
     width: 36px !important;
@@ -375,7 +505,7 @@ button:active {
     height: 36px !important;
   }
   
-  .nav-btn:hover, .zoom-btn:hover {
+  .nav-btn:hover, .zoom-btn:hover, .header-btn:hover {
     transform: scale(1.1) !important;
   }
   
@@ -393,240 +523,7 @@ button:active {
   }
   
   .progress {
-    bottom: 55px !important;
     height: 4px !important;
-  }
-}
-
-@media (max-width: 480px) {
-  .controls {
-    gap: 6px !important;
-    padding: 8px 0 !important;
-    min-height: 48px !important;
-  }
-  
-  .zoom-indicator {
-    bottom: 60px !important;
-    padding: 6px 12px !important;
-    font-size: 13px !important;
-    border-radius: 18px !important;
-    min-width: 70px !important;
-  }
-  
-  #pageInfo {
-    min-width: 65px !important;
-    font-size: 11px !important;
-    padding: 0 12px !important;
-    height: 34px !important;
-    border-radius: 18px !important;
-    margin: 0 6px !important;
-  }
-  
-  button, .nav-btn, .zoom-btn {
-    min-width: 34px !important;
-    height: 34px !important;
-    width: 34px !important;
-    font-size: 13px !important;
-  }
-  
-  .zoom-btn {
-    font-size: 18px !important;
-  }
-  
-  .progress {
-    bottom: 50px !important;
-    height: 3px !important;
-  }
-}
-
-/* Дополнительные стили для верхней панели */
-.header-wrapper {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  z-index: 100;
-  pointer-events: auto !important;
-  transition: transform 0.3s ease, opacity 0.3s ease;
-}
-
-.header {
-  background: rgba(15, 15, 15, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 15px 20px;
-  width: 100%;
-  pointer-events: auto;
-  min-height: 60px;
-  border-bottom: 1px solid rgba(255, 165, 0, 0.1);
-  z-index: 101;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-.comic-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #fff;
-  font-family: 'Inter', sans-serif;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
-  flex: 1;
-  text-align: center;
-  padding: 0 10px;
-}
-
-.header-btn {
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  font-size: 14px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
-  border: none;
-  -webkit-tap-highlight-color: transparent;
-  flex-shrink: 0;
-}
-
-.header-btn:hover {
-  background: rgba(255, 165, 0, 0.9);
-  color: #000;
-  transform: scale(1.1);
-}
-
-.header-btn:active {
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  transform: scale(0.95);
-}
-
-.controls-wrapper {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  z-index: 100;
-  pointer-events: auto !important;
-  transition: transform 0.3s ease, opacity 0.3s ease;
-}
-
-.controls {
-  background: rgba(15, 15, 15, 0.8);
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-  align-items: center;
-  padding: 15px 0;
-  width: 100%;
-  pointer-events: auto;
-  min-height: 70px;
-  border-top: 1px solid rgba(255, 165, 0, 0.1);
-  z-index: 101;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-/* Стили для скрытых панелей */
-.header-wrapper.hidden {
-  transform: translateY(-100%);
-  opacity: 0;
-  pointer-events: none;
-}
-
-.controls-wrapper.hidden {
-  transform: translateY(100%);
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* Стили для прогресс-бара */
-.progress {
-  position: fixed;
-  left: 0;
-  width: 100%;
-  height: 6px;
-  background: rgba(30, 30, 30, 0.9);
-  z-index: 99;
-  border-radius: 0;
-  margin: 0;
-  overflow: hidden;
-  border: none;
-  transition: bottom 0.3s ease;
-}
-
-/* Когда панели видны - прогресс-бар над ними */
-.panels-visible .progress {
-  bottom: 70px;
-}
-
-/* Когда панели скрыты - прогресс-бар в самом низу */
-.panels-hidden .progress {
-  bottom: 0;
-}
-
-.progress-bar {
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, 
-    #FF8C00 0%, 
-    #FFA500 25%, 
-    #FFB732 50%, 
-    #FFC966 75%, 
-    #FFD700 100%);
-  transition: width 0.2s ease;
-  border-radius: 0;
-}
-
-/* Адаптивность для верхней панели */
-@media (max-width: 768px) {
-  .header {
-    padding: 12px 15px;
-    min-height: 50px;
-  }
-  
-  .comic-title {
-    font-size: 16px;
-  }
-  
-  .header-btn {
-    width: 32px;
-    height: 32px;
-    font-size: 12px;
-  }
-  
-  .panels-visible .progress {
-    bottom: 50px;
-  }
-  
-  .panels-hidden .progress {
-    bottom: 0;
-  }
-  
-  @supports (padding-top: env(safe-area-inset-top)) {
-    .header-wrapper {
-      position: fixed !important;
-      top: env(safe-area-inset-top, 0px) !important;
-      z-index: 10000 !important;
-    }
-    
-    .header {
-      padding-top: calc(12px + env(safe-area-inset-top, 0px)) !important;
-    }
-    
-    .progress {
-      bottom: env(safe-area-inset-bottom, 0px) !important;
-    }
-    
-    .panels-visible .progress {
-      bottom: calc(50px + env(safe-area-inset-bottom, 0px)) !important;
-    }
   }
 }
 
@@ -650,8 +547,41 @@ button:active {
     bottom: 48px;
   }
   
+  .controls {
+    gap: 6px !important;
+    padding: 8px 0 !important;
+    min-height: 48px !important;
+  }
+  
+  .zoom-indicator {
+    bottom: 60px !important;
+    padding: 6px 12px !important;
+    font-size: 13px !important;
+    border-radius: 18px !important;
+    min-width: 70px !important;
+  }
+  
+  #pageInfo {
+    min-width: 65px !important;
+    font-size: 11px !important;
+    padding: 0 12px !important;
+    height: 34px !important;
+    border-radius: 18px !important;
+    margin: 0 6px !important;
+  }
+  
+  button, .nav-btn, .zoom-btn, .header-btn {
+    min-width: 34px !important;
+    height: 34px !important;
+    width: 34px !important;
+    font-size: 13px !important;
+  }
+  
+  .zoom-btn {
+    font-size: 18px !important;
+  }
+  
   .progress {
-    height: 4px;
+    height: 3px !important;
   }
 }
-
