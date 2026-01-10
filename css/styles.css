@@ -479,7 +479,7 @@ button:active {
     padding: 10px 0 !important;
     gap: 8px !important;
     min-height: 50px !important;
-    background: rgba(10, 10, 10, 0.95) !important;
+    background: rgba(10, 10, 10, 0.8) !important;
     opacity: 1 !important;
     visibility: visible !important;
     display: flex !important;
