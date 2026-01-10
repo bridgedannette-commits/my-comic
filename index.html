@@ -41,6 +41,7 @@
 </div>
 
 <script>/* ======================================================
+/* ======================================================
    НАСТРОЙКИ
 ====================================================== */
 const COMIC_PATH = 'https://bridgedannette-commits.github.io/my-comic/comics/test/';
@@ -49,7 +50,7 @@ const IMAGE_EXTS = ['webp', 'png', 'jpg', 'jpeg'];
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3.0;
 const ZOOM_STEP = 0.2;
-const MAX_PAGES_SAFE = 500; // защита от бесконечного цикла
+const MAX_PAGES_SAFE = 500;
 
 /* ======================================================
    СОСТОЯНИЕ
@@ -109,27 +110,30 @@ async function detectPages() {
 ====================================================== */
 async function loadComic() {
   canvas.innerHTML = 'Загрузка…';
-
   pages = await detectPages();
-
   canvas.innerHTML = '';
 
   pages.forEach(src => {
     const page = document.createElement('div');
     page.className = 'comic-page';
+    page.style.margin = '0 auto';
+    page.style.width = 'fit-content';
 
     const img = document.createElement('img');
     img.src = src;
     img.loading = 'lazy';
     img.draggable = false;
+    img.style.display = 'block';
     img.style.maxWidth = '100%';
     img.style.height = 'auto';
-    img.style.display = 'block';
 
     page.appendChild(img);
     canvas.appendChild(page);
   });
 
+  // устанавливаем ширину canvas по контенту
+  canvas.style.width = 'fit-content';
+  canvas.style.margin = '0 auto';
   updatePageInfo();
 }
 
@@ -137,10 +141,10 @@ async function loadComic() {
    ЗУМ
 ====================================================== */
 function setZoomOriginToCenter() {
-  const rect = wrapper.getBoundingClientRect();
-  const originX = rect.width / 2;
-  const originY = wrapper.scrollTop + rect.height / 2;
-  canvas.style.transformOrigin = `${originX}px ${originY}px`;
+  const wrapperRect = wrapper.getBoundingClientRect();
+  const centerX = wrapperRect.width / 2;
+  const centerY = wrapper.scrollTop + wrapperRect.height / 2;
+  canvas.style.transformOrigin = `${centerX}px ${centerY}px`;
 }
 
 function applyZoom(delta) {
@@ -183,7 +187,6 @@ function getCurrentPage() {
     const r = el.getBoundingClientRect();
     const c = r.top + r.height / 2;
     const d = Math.abs(c - center);
-
     if (d < minDistance) {
       minDistance = d;
       closest = i + 1;
