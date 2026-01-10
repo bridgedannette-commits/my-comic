@@ -1,0 +1,804 @@
+<div class="comic-reader" id="reader">
+  <div class="canvas-wrapper" id="canvasWrapper"></div>
+
+  <!-- Индикатор масштаба над панелью -->
+  <div class="zoom-indicator" id="zoomIndicator">
+    <span id="zoomPercent">100%</span>
+  </div>
+
+  <div class="controls-wrapper">
+    <div class="controls" id="controls">
+      <button id="toTop" title="В начало" class="nav-btn">▲</button>
+      <button id="zoomOut" title="Уменьшить" class="zoom-btn">−</button>
+      <span id="pageInfo">– / –</span>
+      <button id="zoomIn" title="Увеличить" class="zoom-btn">+</button>
+      <button id="toBottom" title="В конец" class="nav-btn">▼</button>
+    </div>
+  </div>
+
+  <div class="progress">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+</div>
+
+<style>
+/* Сброс стилей WordPress */
+#reader * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+}
+
+.comic-reader {
+  width: 100vw !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  background: #111;
+  color: #fff;
+  position: fixed;
+  top: 0;
+  left: 0;
+  border-radius: 0 !important;
+  overflow: hidden;
+  box-shadow: none !important;
+  display: flex;
+  flex-direction: column;
+  border: none !important;
+  isolation: isolate;
+}
+
+/* Контейнер для canvas должен центрировать комикс */
+.canvas-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  background: #111;
+  scroll-behavior: smooth;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  margin: 0;
+  font-size: 0;
+  line-height: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Canvas комикса остаётся прежнего размера */
+canvas {
+  display: block;
+  background: #111;
+  margin: 0 auto !important;
+  padding: 0;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  cursor: grab;
+  max-width: 100% !important;
+}
+
+canvas:active {
+  cursor: grabbing;
+}
+
+/* Обертка для навигационной панели на всю ширину */
+.controls-wrapper {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  z-index: 100;
+  pointer-events: none;
+}
+
+/* Индикатор масштаба */
+.zoom-indicator {
+  position: absolute;
+  bottom: 85px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30, 30, 30, 0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 24px;
+  padding: 10px 20px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #fff;
+  z-index: 99;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  border: 1px solid rgba(255, 165, 0, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+.zoom-indicator.visible {
+  opacity: 1;
+}
+
+#zoomPercent {
+  color: #FFA500;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* Навигационная панель на всю ширину */
+.controls {
+  background: rgba(25, 25, 25, 0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  align-items: center;
+  padding: 15px 0;
+  width: 100%;
+  border-top: 1px solid rgba(255, 165, 0, 0.2);
+  pointer-events: auto;
+  min-height: 70px;
+}
+
+/* Кнопки навигации в начало/конец */
+.nav-btn {
+  background: rgba(40, 40, 40, 0.9);
+  color: #fff;
+  font-size: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.nav-btn:hover {
+  background: rgba(255, 165, 0, 0.8);
+  color: #000;
+  transform: translateY(-2px) scale(1.08);
+}
+
+/* Кнопки зума */
+.zoom-btn {
+  background: rgba(40, 40, 40, 0.9);
+  color: #fff;
+  font-size: 24px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-weight: 300;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.zoom-btn:hover {
+  background: rgba(255, 165, 0, 0.8);
+  color: #000;
+  transform: translateY(-2px) scale(1.08);
+}
+
+button {
+  background: transparent;
+  color: #fff;
+  border: none;
+  padding: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+button:hover {
+  transform: translateY(-2px);
+}
+
+button:active {
+  transform: translateY(0);
+}
+
+#pageInfo {
+  font-size: 14px;
+  font-weight: 500;
+  padding: 0 20px;
+  min-width: 90px;
+  text-align: center;
+  color: #fff;
+  background: rgba(40, 40, 40, 0.9);
+  border-radius: 25px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 165, 0, 0.2);
+  margin: 0 10px;
+  letter-spacing: 0.3px;
+}
+
+/* Прогресс-бар над навигационной панелью */
+.progress {
+  position: absolute;
+  bottom: 70px;
+  left: 0;
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  z-index: 101;
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  border-radius: 3px;
+  margin: 0;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #FF8C00, #FFA500);
+  transition: width 0.2s ease;
+  box-shadow: 
+    0 0 20px rgba(255, 140, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .comic-reader {
+    height: 100vh !important;
+    border-radius: 0 !important;
+  }
+  
+  .controls {
+    padding: 12px 0;
+    gap: 10px;
+    min-height: 60px;
+  }
+  
+  .zoom-indicator {
+    bottom: 75px;
+    padding: 8px 16px;
+    font-size: 14px;
+    border-radius: 20px;
+  }
+  
+  button, .nav-btn, .zoom-btn {
+    min-width: 40px;
+    height: 40px;
+    width: 40px;
+    font-size: 15px;
+  }
+  
+  .nav-btn, .zoom-btn {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .zoom-btn {
+    font-size: 22px;
+  }
+  
+  #pageInfo {
+    font-size: 13px;
+    min-width: 80px;
+    padding: 0 16px;
+    height: 40px;
+    border-radius: 22px;
+  }
+  
+  .progress {
+    bottom: 60px;
+    height: 5px;
+  }
+}
+
+@media (max-width: 480px) {
+  .controls {
+    gap: 8px;
+    padding: 10px 0;
+    min-height: 55px;
+  }
+  
+  .zoom-indicator {
+    bottom: 70px;
+    padding: 6px 14px;
+    font-size: 13px;
+    border-radius: 18px;
+  }
+  
+  #pageInfo {
+    min-width: 70px;
+    font-size: 12px;
+    padding: 0 14px;
+    height: 38px;
+    border-radius: 20px;
+  }
+  
+  button, .nav-btn, .zoom-btn {
+    min-width: 38px;
+    height: 38px;
+    width: 38px;
+    font-size: 14px;
+  }
+  
+  .zoom-btn {
+    font-size: 20px;
+  }
+  
+  .progress {
+    bottom: 55px;
+    height: 4px;
+  }
+}
+
+/* Кастомный скроллбар - ОРАНЖЕВЫЙ ГРАДИЕНТ */
+.canvas-wrapper::-webkit-scrollbar {
+  width: 10px;
+}
+
+.canvas-wrapper::-webkit-scrollbar-track {
+  background: rgba(30, 30, 30, 0.8);
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.canvas-wrapper::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #FF8C00, #FFA500);
+  border-radius: 5px;
+  border: 1px solid rgba(255, 140, 0, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.canvas-wrapper::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(to bottom, #FFA500, #FFB732);
+  border-color: rgba(255, 165, 0, 0.5);
+}
+
+.canvas-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: #FFA500 rgba(30, 30, 30, 0.8);
+}
+
+/* Анимация для индикатора */
+@keyframes softPulse {
+  0% { 
+    transform: translateX(-50%) scale(1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+  50% { 
+    transform: translateX(-50%) scale(1.03);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  }
+  100% { 
+    transform: translateX(-50%) scale(1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+}
+
+.zoom-indicator.visible {
+  animation: softPulse 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Эффект свечения при наведении на кнопки */
+.nav-btn::after,
+.zoom-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at center, rgba(255, 165, 0, 0.3), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.nav-btn:hover::after,
+.zoom-btn:hover::after {
+  opacity: 1;
+}
+
+/* Индикатор загрузки для прогресс-бара */
+.progress-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    transparent 100%
+  );
+  animation: shimmer 2s infinite;
+  border-radius: 3px;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+// Устанавливаем worker
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+const PDF_URL = "https://bridgedannette-commits.github.io/my-comic/mycomic.pdf";
+
+let pdfDoc = null;
+let zoom = 1.0;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 3.0;
+const ZOOM_STEP = 0.2;
+
+let currentRenderId = 0;
+let zoomIndicatorTimeout = null;
+
+const wrapper = document.getElementById("canvasWrapper");
+const pageInfo = document.getElementById("pageInfo");
+const progressBar = document.getElementById("progressBar");
+const zoomIndicator = document.getElementById("zoomIndicator");
+const zoomPercent = document.getElementById("zoomPercent");
+const zoomInBtn = document.getElementById("zoomIn");
+const zoomOutBtn = document.getElementById("zoomOut");
+const toTopBtn = document.getElementById("toTop");
+const toBottomBtn = document.getElementById("toBottom");
+const reader = document.getElementById("reader");
+
+const canvases = [];
+
+// Инициализация PDF
+async function initPDF() {
+  try {
+    wrapper.innerHTML = '<div style="color: #ccc; text-align: center; padding: 50px; font-size: 16px;">Загрузка комикса...</div>';
+    
+    pdfDoc = await pdfjsLib.getDocument(PDF_URL).promise;
+    
+    wrapper.innerHTML = '';
+    
+    pageInfo.textContent = `1 / ${pdfDoc.numPages}`;
+    
+    for (let i = 1; i <= pdfDoc.numPages; i++) {
+      const canvas = document.createElement("canvas");
+      canvas.id = `page-${i}`;
+      canvas.className = 'pdf-page';
+      wrapper.appendChild(canvas);
+      canvases.push(canvas);
+    }
+    
+    await renderAllPages();
+    setupEventListeners();
+    
+    // Устанавливаем комикс на всю страницу
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    
+  } catch (error) {
+    console.error("Ошибка загрузки PDF:", error);
+    wrapper.innerHTML = '<div style="color: #fff; text-align: center; padding: 50px; font-size: 16px;">Ошибка загрузки комикса</div>';
+  }
+}
+
+// Получаем целевую ширину
+function getTargetWidth() {
+    return Math.min(600, window.innerWidth * 0.9);
+}
+
+// Рендерим одну страницу
+async function renderPage(pageNum, renderId) {
+  if (!pdfDoc || renderId !== currentRenderId) return;
+  
+  const page = await pdfDoc.getPage(pageNum);
+  const canvas = canvases[pageNum - 1];
+  const ctx = canvas.getContext("2d");
+  
+  const viewport = page.getViewport({ scale: 1 });
+  const targetWidth = getTargetWidth();
+  const baseScale = targetWidth / viewport.width;
+  const finalScale = baseScale * zoom;
+  
+  const scaledViewport = page.getViewport({ scale: finalScale });
+  
+  canvas.width = scaledViewport.width;
+  canvas.height = scaledViewport.height;
+  canvas.style.width = `${scaledViewport.width}px`;
+  canvas.style.height = `${scaledViewport.height}px`;
+  canvas.style.margin = '0 auto';
+  
+  const renderContext = {
+    canvasContext: ctx,
+    viewport: scaledViewport
+  };
+  
+  await page.render(renderContext).promise;
+}
+
+// Рендерим все страницы
+async function renderAllPages() {
+  currentRenderId++;
+  
+  const renderId = currentRenderId;
+  const promises = [];
+  
+  for (let i = 1; i <= pdfDoc.numPages; i++) {
+    promises.push(new Promise(resolve => {
+      setTimeout(async () => {
+        if (renderId === currentRenderId) {
+          await renderPage(i, renderId);
+        }
+        resolve();
+      }, i * 10);
+    }));
+  }
+  
+  await Promise.all(promises);
+}
+
+// Показываем индикатор зума
+function showZoomIndicator() {
+  zoomPercent.textContent = `${Math.round(zoom * 100)}%`;
+  zoomIndicator.classList.add('visible');
+  
+  if (zoomIndicatorTimeout) {
+    clearTimeout(zoomIndicatorTimeout);
+  }
+  
+  zoomIndicatorTimeout = setTimeout(() => {
+    zoomIndicator.classList.remove('visible');
+  }, 1500);
+}
+
+// Применяем зум
+async function applyZoom(delta) {
+  const newZoom = zoom + delta;
+  
+  if (newZoom < MIN_ZOOM || newZoom > MAX_ZOOM) {
+    return;
+  }
+  
+  zoom = parseFloat(newZoom.toFixed(2));
+  
+  // Показываем индикатор зума
+  showZoomIndicator();
+  
+  await renderAllPages();
+}
+
+// Обновляем информацию о странице
+function updatePageInfo() {
+  if (!pdfDoc) return;
+  
+  const currentPage = getCurrentPage();
+  pageInfo.textContent = `${currentPage} / ${pdfDoc.numPages}`;
+}
+
+// Получаем текущую страницу
+function getCurrentPage() {
+  if (!pdfDoc || canvases.length === 0) return 1;
+  
+  const scrollTop = wrapper.scrollTop;
+  const wrapperHeight = wrapper.clientHeight;
+  
+  let currentPage = 1;
+  let minDistance = Infinity;
+  
+  for (let i = 0; i < canvases.length; i++) {
+    const canvas = canvases[i];
+    const rect = canvas.getBoundingClientRect();
+    const wrapperRect = wrapper.getBoundingClientRect();
+    
+    const canvasCenter = rect.top + rect.height / 2;
+    const wrapperCenter = wrapperRect.top + wrapperHeight / 2;
+    const distance = Math.abs(canvasCenter - wrapperCenter);
+    
+    if (distance < minDistance) {
+      minDistance = distance;
+      currentPage = i + 1;
+    }
+  }
+  
+  return currentPage;
+}
+
+// Прокрутка в начало
+function scrollToTop() {
+  wrapper.scrollTo({
+    top: 0,
+    behavior: 'smooth'
+  });
+}
+
+// Прокрутка в конец
+function scrollToBottom() {
+  wrapper.scrollTo({
+    top: wrapper.scrollHeight,
+    behavior: 'smooth'
+  });
+}
+
+// Настройка обработчиков событий
+function setupEventListeners() {
+  zoomInBtn.onclick = () => applyZoom(ZOOM_STEP);
+  zoomOutBtn.onclick = () => applyZoom(-ZOOM_STEP);
+  
+  toTopBtn.onclick = scrollToTop;
+  toBottomBtn.onclick = scrollToBottom;
+  
+  wrapper.addEventListener("scroll", () => {
+    const scrollTop = wrapper.scrollTop;
+    const scrollHeight = wrapper.scrollHeight - wrapper.clientHeight;
+    
+    if (scrollHeight > 0) {
+      const progress = (scrollTop / scrollHeight * 100);
+      progressBar.style.width = progress + "%";
+      progressBar.style.transition = 'width 0.1s ease';
+    }
+    
+    updatePageInfo();
+  }, { passive: true });
+  
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey) {
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        applyZoom(ZOOM_STEP);
+        return;
+      }
+      if (e.key === '-') {
+        e.preventDefault();
+        applyZoom(-ZOOM_STEP);
+        return;
+      }
+    }
+    
+    switch(e.key) {
+      case 'ArrowDown':
+      case 'PageDown':
+      case ' ':
+        e.preventDefault();
+        wrapper.scrollBy({ top: wrapper.clientHeight * 0.8, behavior: 'smooth' });
+        break;
+      case 'ArrowUp':
+      case 'PageUp':
+        e.preventDefault();
+        wrapper.scrollBy({ top: -wrapper.clientHeight * 0.8, behavior: 'smooth' });
+        break;
+      case 'Home':
+        e.preventDefault();
+        scrollToTop();
+        break;
+      case 'End':
+        e.preventDefault();
+        scrollToBottom();
+        break;
+    }
+  });
+  
+  let resizeTimeout;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(async () => {
+      if (pdfDoc) {
+        await renderAllPages();
+        updatePageInfo();
+      }
+    }, 250);
+  });
+  
+  // Перетаскивание
+  let isDragging = false;
+  let startY = 0;
+  let scrollTop = 0;
+  
+  wrapper.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    startY = e.clientY;
+    scrollTop = wrapper.scrollTop;
+    wrapper.style.cursor = 'grabbing';
+  });
+  
+  document.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const walk = (startY - e.clientY) * 2;
+    wrapper.scrollTop = scrollTop + walk;
+  });
+  
+  document.addEventListener('mouseup', () => {
+    isDragging = false;
+    wrapper.style.cursor = 'grab';
+  });
+  
+  // Тач события
+  wrapper.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) {
+      startY = e.touches[0].clientY;
+      scrollTop = wrapper.scrollTop;
+    }
+  }, { passive: true });
+  
+  wrapper.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 1) {
+      const walk = (startY - e.touches[0].clientY) * 2;
+      wrapper.scrollTop = scrollTop + walk;
+    }
+  }, { passive: true });
+}
+
+// Инициализация
+initPDF();
+
+// Устанавливаем стили для открытия на всю страницу
+document.addEventListener('DOMContentLoaded', function() {
+  document.documentElement.style.overflow = 'hidden';
+  document.body.style.overflow = 'hidden';
+  
+  // Убираем пробелы вокруг канвасов
+  setTimeout(() => {
+    if (wrapper) {
+      wrapper.style.fontSize = '0';
+      wrapper.style.lineHeight = '0';
+      
+      const allCanvas = wrapper.querySelectorAll('canvas');
+      allCanvas.forEach(canvas => {
+        canvas.style.margin = '0 auto';
+        canvas.style.padding = '0';
+        canvas.style.border = '0';
+        canvas.style.display = 'block';
+      });
+    }
+  }, 500);
+});
+
+// Обработка изменения размера окна
+window.addEventListener('load', function() {
+  // Принудительно устанавливаем комикс на весь экран
+  reader.style.width = '100vw';
+  reader.style.height = '100vh';
+  reader.style.position = 'fixed';
+  reader.style.top = '0';
+  reader.style.left = '0';
+  reader.style.zIndex = '9999';
+  
+  document.documentElement.style.overflow = 'hidden';
+  document.body.style.overflow = 'hidden';
+  
+  // Рендерим заново после полной загрузки страницы
+  setTimeout(() => {
+    if (pdfDoc) {
+      renderAllPages();
+    }
+  }, 100);
+});
+</script>
