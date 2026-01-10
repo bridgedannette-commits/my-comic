@@ -62,7 +62,7 @@ const canvases = [];
 // Инициализация PDF
 async function initPDF() {
   try {
-    wrapper.innerHTML = '<div style="color: #ccc; text-align: center; padding: 50px; font-size: 16px; font-family: \'Inter\', sans-serif;">Загрузка комикса...</div>';
+    wrapper.innerHTML = '<div style="color: #ccc; text-align: center; padding: 50px; font-size: 16px; font-family: \'Inter\', sans-serif;">Loading...</div>';
     
     pdfDoc = await pdfjsLib.getDocument(PDF_URL).promise;
     
