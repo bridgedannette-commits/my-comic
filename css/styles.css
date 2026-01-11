@@ -428,6 +428,10 @@ html, body {
   filter: invert(1); /* При наведении делаем чёрными, т.к. кнопка становится оранжевой */
 }
 
+.nav-btn:active .icon {
+    filter: invert(0) !important; /* Или ваше исходное значение */
+  }
+
 .auto-scroll-btn.active .icon {
   filter: invert(1); /* Когда активен - чёрная иконка */
 }
@@ -447,6 +451,7 @@ html, body {
     width: 20px;
     height: 20px;
   }
+  
 }
 
 @media (max-width: 480px) {
@@ -466,21 +471,5 @@ html, body {
   }
 }
 
-@media (hover: none) and (pointer: coarse) {
-  .nav-btn {
-    transition: transform 0.15s ease, background 0.15s ease;
-  }
-  
-  .nav-btn:active {
-    transform: scale(0.95);
-    background: rgba(0, 0, 0, 0.5);
-    transition: transform 0.05s ease, background 0.05s ease;
-  }
-  
-  /* Быстрый сброс после нажатия */
-  .nav-btn:not(:active) {
-    transition: transform 0.3s ease, background 0.3s ease;
-  }
-}
 
 
