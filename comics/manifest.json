@@ -6,6 +6,12 @@
       "title": "Test Comic",
       "pageCount": 3,
       "path": "/my-comic/comics/test/"
+    },
+    {
+      "id": "test-comic-2",
+      "title": "Test Comic 2",
+      "pageCount": 1,
+      "path": "/my-comic/comics/test2/"
     }
   ]
 }
