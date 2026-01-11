@@ -418,16 +418,16 @@ html, body {
   width: 24px;
   height: 24px;
   object-fit: contain;
-  filter: invert(1); /* Делаем белыми, т.к. кнопки темные */
+  filter: invert(0); /* Делаем белыми, т.к. кнопки темные */
   transition: filter 0.3s ease;
 }
 
 .nav-btn:hover .icon {
-  filter: invert(0); /* При наведении делаем чёрными, т.к. кнопка становится оранжевой */
+  filter: invert(1); /* При наведении делаем чёрными, т.к. кнопка становится оранжевой */
 }
 
 .auto-scroll-btn.active .icon {
-  filter: invert(0); /* Когда активен - чёрная иконка */
+  filter: invert(1); /* Когда активен - чёрная иконка */
 }
 
 /* Адаптивность для Loading Screen */
