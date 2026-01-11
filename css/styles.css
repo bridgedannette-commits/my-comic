@@ -107,7 +107,6 @@ html, body {
   text-overflow: ellipsis;
   overflow: hidden;
   white-space: nowrap;
-  padding-left: 20px !important;
 }
 
 .header-page-info {
