@@ -361,7 +361,7 @@ html, body {
     height: 4px !important; /* Увеличено с 3px */
   }
   .panels-visible .progress {
-    bottom: 76px !important; 
+    bottom: 60px !important; 
 }
 }
 
