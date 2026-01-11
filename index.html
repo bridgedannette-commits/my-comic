@@ -10,9 +10,92 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ================= LOADING SCREEN ================= */
+.loading-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 1;
+  transition: opacity 0.5s ease;
+}
+
+.loading-screen.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top: 4px solid #FFA500;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-text {
+  color: #fff;
+  font-size: 16px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Адаптивность для Loading Screen */
+@media (max-width: 768px) {
+  .loading-spinner {
+    width: 40px;
+    height: 40px;
+    border-width: 3px;
+  }
+  
+  .loading-text {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .loading-spinner {
+    width: 30px;
+    height: 30px;
+    border-width: 3px;
+  }
+  
+  .loading-text {
+    font-size: 13px;
+  }
+}
+</style>
 </head>
 
 <body>
+
+<!-- Loading Screen -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-content">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Загрузка комикса...</div>
+  </div>
+</div>
 
 <div class="comic-reader" id="reader">
   <!-- Верхняя панель -->
@@ -29,7 +112,7 @@
   <div class="controls-wrapper" id="controlsWrapper">
     <div class="controls">
       <button id="toTop" class="nav-btn">▲</button>
-      <button id="autoScroll" class="nav-btn auto-scroll-btn">▽</button>
+      <button id="autoScroll" class="nav-btn auto-scroll-btn" title="Автоскролл">▽</button>
       <button id="toBottom" class="nav-btn">▼</button>
     </div>
   </div>
@@ -57,6 +140,7 @@ const controlsWrapper = document.getElementById('controlsWrapper');
 const comicTitle = document.getElementById('comicTitle');
 const headerPageInfo = document.getElementById('headerPageInfo');
 const reader = document.getElementById('reader');
+const loadingScreen = document.getElementById('loadingScreen');
 
 // Таймеры для скрытия панелей
 let hidePanelsTimeout;
@@ -65,7 +149,7 @@ const HIDE_PANELS_DELAY = 3000; // 3 секунды до скрытия
 
 // Автоскролл
 let autoScrollInterval = null;
-const AUTO_SCROLL_SPEED = 100; // фиксированная скорость (пикселей в секунду)
+const AUTO_SCROLL_SPEED = 150; // фиксированная скорость (пикселей в секунду)
 let autoScrollActive = false;
 
 /* ================= ФУНКЦИИ ДЛЯ ПАНЕЛЕЙ ================= */
@@ -156,13 +240,15 @@ function updateAutoScrollButton() {
   if (autoScrollActive) {
     autoScrollBtn.innerHTML = '■';
     autoScrollBtn.classList.add('active');
+    autoScrollBtn.title = 'Автоскролл - нажмите для остановки';
   } else {
     autoScrollBtn.innerHTML = '▽';
     autoScrollBtn.classList.remove('active');
+    autoScrollBtn.title = 'Автоскролл - нажмите для начала';
   }
 }
 
-/* ================= ЗАГРУЗКА ================= */
+/* ================= ЗАГРУЗКА КОМИКСА ================= */
 async function imageExists(url) {
   try {
     const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
@@ -196,12 +282,19 @@ async function detectPages() {
 }
 
 async function loadComic() {
+  // Показываем loading screen
+  loadingScreen.classList.remove('hidden');
+  
   wrapper.innerHTML = '<div style="color:#ccc;text-align:center;padding:50px;">Загрузка...</div>';
   
   pages = await detectPages();
   
   if (pages.length === 0) {
     wrapper.innerHTML = '<div style="color:#fff;text-align:center;padding:50px;">Комикс не найден</div>';
+    // Скрываем loading screen при ошибке
+    setTimeout(() => {
+      loadingScreen.classList.add('hidden');
+    }, 500);
     return;
   }
   
@@ -257,12 +350,46 @@ async function loadComic() {
   
   updatePageInfo();
   
+  // Ждем загрузки всех изображений
+  const images = wrapper.querySelectorAll('img');
+  let loadedCount = 0;
+  
+  if (images.length === 0) {
+    setTimeout(() => {
+      loadingScreen.classList.add('hidden');
+    }, 300);
+  } else {
+    images.forEach(img => {
+      if (img.complete) {
+        loadedCount++;
+        checkAllImagesLoaded(loadedCount, images.length);
+      } else {
+        img.addEventListener('load', () => {
+          loadedCount++;
+          checkAllImagesLoaded(loadedCount, images.length);
+        });
+        img.addEventListener('error', () => {
+          loadedCount++;
+          checkAllImagesLoaded(loadedCount, images.length);
+        });
+      }
+    });
+  }
+  
   setTimeout(() => {
     wrapper.querySelectorAll('img[data-src]').forEach(img => {
       img.src = img.dataset.src;
       delete img.dataset.src;
     });
   }, 100);
+}
+
+function checkAllImagesLoaded(loaded, total) {
+  if (loaded === total) {
+    setTimeout(() => {
+      loadingScreen.classList.add('hidden');
+    }, 300);
+  }
 }
 
 /* ================= НАВИГАЦИЯ ================= */
@@ -333,7 +460,6 @@ wrapper.addEventListener('click', (e) => {
     return;
   }
   
-  // Убрали остановку автоскролла при клике на комикс
   togglePanels();
 });
 
@@ -370,7 +496,6 @@ wrapper.addEventListener('touchend', (e) => {
       return;
     }
     
-    // Убрали остановку автоскролла при тапе на комикс
     togglePanels();
     e.preventDefault();
   }
@@ -481,6 +606,13 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('load', () => {
   setTimeout(updatePageInfo, 100);
 });
+
+// Скрываем loading screen через 10 секунд максимум (на всякий случай)
+setTimeout(() => {
+  if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
+    loadingScreen.classList.add('hidden');
+  }
+}, 10000);
 </script>
 </body>
 </html>
