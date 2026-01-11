@@ -346,7 +346,7 @@ html, body {
   
   .controls {
     gap: 10px !important; /* Увеличено с 6px */
-    padding: 12px 0 !important; /* Увеличено с 8px */
+    padding: 8px 0 !important; /* Увеличено с 8px */
     min-height: 60px !important; /* Увеличено с 48px */
   }
   
@@ -360,6 +360,9 @@ html, body {
   .progress {
     height: 4px !important; /* Увеличено с 3px */
   }
+  .panels-visible .progress {
+    bottom: 76px !important; 
+}
 }
 
 /* ================= LOADING SCREEN ================= */
