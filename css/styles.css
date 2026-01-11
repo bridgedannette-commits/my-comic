@@ -118,7 +118,7 @@ html, body {
   color: #fff;
   background: rgba(0, 0, 0, 0.5);
   border-radius: 20px;
-  padding: 8px 16px;
+  padding: 8px 16px !important;
   min-width: 80px;
   text-align: center;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -267,7 +267,7 @@ html, body {
   }
   
   .panels-visible .progress {
-    bottom: 50px;
+    bottom: 60px; /* Увеличено для больших кнопок */
   }
   
   .panels-hidden .progress {
@@ -275,21 +275,21 @@ html, body {
   }
   
   .controls {
-    padding: 10px 0 !important;
-    gap: 8px !important;
-    min-height: 50px !important;
+    padding: 15px 0 !important; /* Увеличено */
+    gap: 12px !important; /* Увеличено */
+    min-height: 65px !important; /* Увеличено */
     background: rgba(10, 10, 10, 0.95) !important;
   }
   
   .nav-btn {
-    min-width: 36px !important;
-    height: 36px !important;
-    width: 36px !important;
-    font-size: 14px !important;
+    min-width: 46px !important; /* Увеличено с 36px */
+    height: 46px !important; /* Увеличено с 36px */
+    width: 46px !important; /* Увеличено с 36px */
+    font-size: 18px !important; /* Увеличено с 14px */
   }
   
   .progress {
-    height: 4px !important;
+    height: 5px !important; /* Увеличено с 4px */
   }
   
   /* Фикс для безопасных зон на iOS */
@@ -321,7 +321,7 @@ html, body {
     }
     
     .panels-visible .progress {
-      bottom: calc(50px + env(safe-area-inset-bottom, 0px)) !important;
+      bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important; /* Увеличено с 50px */
     }
   }
 }
@@ -344,23 +344,23 @@ html, body {
   }
   
   .panels-visible .progress {
-    bottom: 48px;
+    bottom: 58px; /* Увеличено с 48px */
   }
   
   .controls {
-    gap: 6px !important;
-    padding: 8px 0 !important;
-    min-height: 48px !important;
+    gap: 10px !important; /* Увеличено с 6px */
+    padding: 12px 0 !important; /* Увеличено с 8px */
+    min-height: 60px !important; /* Увеличено с 48px */
   }
   
   .nav-btn {
-    min-width: 34px !important;
-    height: 34px !important;
-    width: 34px !important;
-    font-size: 13px !important;
+    min-width: 44px !important; /* Увеличено с 34px */
+    height: 44px !important; /* Увеличено с 34px */
+    width: 44px !important; /* Увеличено с 34px */
+    font-size: 17px !important; /* Увеличено с 13px */
   }
   
   .progress {
-    height: 3px !important;
+    height: 4px !important; /* Увеличено с 3px */
   }
 }
