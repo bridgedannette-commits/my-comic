@@ -255,11 +255,11 @@ function toggleAutoScroll() {
 function updateAutoScrollButton() {
   const autoScrollBtn = document.getElementById('autoScroll');
   if (autoScrollActive) {
-    autoScrollBtn.innerHTML = '■';
+    autoScrollIcon.src = 'icons/pause.png';
     autoScrollBtn.classList.add('active');
     autoScrollBtn.title = 'Autoscroll - click to stop';
   } else {
-    autoScrollBtn.innerHTML = '▽';
+    autoScrollIcon.src = 'icons/play.png';
     autoScrollBtn.classList.remove('active');
     autoScrollBtn.title = 'Autoscroll - click to start';
   }
