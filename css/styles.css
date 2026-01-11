@@ -27,15 +27,13 @@ html, body {
   left: 0;
   border-radius: 0 !important;
   overflow: hidden;
-  box-shadow: none !important;
   display: flex;
   flex-direction: column;
-  border: none !important;
   isolation: isolate;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
-/* Контейнер для canvas */
+/* ================= КОНТЕЙНЕР СТРАНИЦ ================= */
 .canvas-wrapper {
   flex: 1;
   overflow-y: auto;
@@ -50,17 +48,15 @@ html, body {
   line-height: 0;
   width: 100%;
   height: 100%;
-  /* Убираем скроллбар */
   scrollbar-width: none;
   -ms-overflow-style: none;
-  -webkit-overflow-scrolling: touch; /* Для плавного скролла на iOS */
+  -webkit-overflow-scrolling: touch;
 }
 
 .canvas-wrapper::-webkit-scrollbar {
   display: none;
 }
 
-/* Стили для страниц комикса */
 .page-container {
   display: flex;
   justify-content: center;
@@ -78,23 +74,6 @@ html, body {
   image-rendering: crisp-edges;
   margin: 0;
   padding: 0;
-}
-
-/* Canvas комикса */
-canvas {
-  display: block;
-  background: #111;
-  margin: 0 auto !important;
-  padding: 0;
-  border: none;
-  outline: none;
-  box-shadow: none;
-  cursor: grab;
-  max-width: 100% !important;
-}
-
-canvas:active {
-  cursor: grabbing;
 }
 
 /* ================= ВЕРХНЯЯ ПАНЕЛЬ ================= */
@@ -118,7 +97,6 @@ canvas:active {
   pointer-events: auto;
   min-height: 60px;
   z-index: 101;
-  /* Убрали backdrop-filter - просто полупрозрачная панель */
 }
 
 .comic-title {
@@ -134,58 +112,90 @@ canvas:active {
   padding: 0 10px;
 }
 
-.header-btn {
-  background: rgba(0, 0, 0, 0.5);
+.header-page-info {
+  font-size: 16px;
+  font-weight: 500;
   color: #fff;
-  font-size: 14px;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
-  border: none;
-  -webkit-tap-highlight-color: transparent;
-  flex-shrink: 0;
-}
-
-.header-btn:hover {
-  background: rgba(255, 165, 0, 0.9);
-  color: #000;
-  transform: scale(1.1);
-}
-
-.header-btn:active {
   background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  transform: scale(0.95);
+  border-radius: 20px;
+  padding: 8px 16px;
+  min-width: 80px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
-/* Обертка для навигационной панели - ИСПРАВЛЕНО */
+/* ================= НИЖНЯЯ ПАНЕЛЬ ================= */
 .controls-wrapper {
   position: absolute;
   bottom: 0;
   left: 0;
   width: 100%;
   z-index: 100;
-  pointer-events: auto !important; /* ВАЖНО: исправляем проблему с кнопками */
+  pointer-events: auto !important;
   transition: transform 0.3s ease;
 }
 
-/* Стили для скрытых панелей - только трансформация, без изменения opacity */
-.header-wrapper.hidden {
-  transform: translateY(-100%);
-  pointer-events: none;
+.controls {
+  background: rgba(15, 15, 15, 0.85);
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  align-items: center;
+  padding: 15px 0;
+  width: 100%;
+  pointer-events: auto;
+  min-height: 70px;
+  z-index: 101;
 }
 
-.controls-wrapper.hidden {
-  transform: translateY(100%);
-  pointer-events: none;
+/* ================= КНОПКИ ================= */
+.nav-btn {
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  transform: scale(1);
+  border: none;
+  position: relative;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* Стили для прогресс-бара */
+/* На мобильных устройствах - НЕ РЫЖИЕ КНОПКИ */
+@media (hover: hover) {
+  .nav-btn:hover {
+    background: rgba(255, 165, 0, 0.9);
+    color: #000;
+    transform: scale(1.15);
+    box-shadow: 
+      0 0 12px rgba(255, 165, 0, 0.6),
+      0 0 24px rgba(255, 165, 0, 0.3);
+  }
+}
+
+.nav-btn:active {
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  transform: scale(0.95);
+  box-shadow: none;
+  transition: all 0.1s ease;
+}
+
+/* Кнопка автоскролла */
+.auto-scroll-btn.active {
+  background: rgba(255, 165, 0, 0.9) !important;
+  color: #000 !important;
+}
+
+/* ================= ПРОГРЕСС-БАР ================= */
 .progress {
   position: fixed;
   left: 0;
@@ -223,202 +233,25 @@ canvas:active {
   border-radius: 0;
 }
 
-/* Индикатор масштаба */
-.zoom-indicator {
-  position: absolute;
-  bottom: 90px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(15, 15, 15, 0.8);
-  border-radius: 28px;
-  padding: 10px 0px !important; /* !important и больше */
-  font-size: 18px !important; /* Больше шрифт */
-  font-weight: 500;
-  color: #fff;
-  z-index: 99;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-  box-shadow: 0 12px 50px rgba(0, 0, 0, 0.7);
+/* ================= СКРЫТЫЕ ПАНЕЛИ ================= */
+.header-wrapper.hidden {
+  transform: translateY(-100%);
   pointer-events: none;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  min-width: 100px !important; /* Шире */
-  text-align: center;
-  /* Гарантируем видимость */
-  display: block !important;
-  visibility: visible !important;
 }
 
-.zoom-indicator.visible {
-  opacity: 1;
+.controls-wrapper.hidden {
+  transform: translateY(100%);
+  pointer-events: none;
 }
 
-#zoomPercent {
-  color: #FFA500;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-}
-
-/* Навигационная панель */
-.controls {
-  background: rgba(15, 15, 15, 0.8);
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-  align-items: center;
-  padding: 15px 0;
-  width: 100%;
-  pointer-events: auto;
-  min-height: 70px;
-  border-top: 1px solid rgba(255, 165, 0, 0.15);
-  z-index: 101;
-  /* Убрали backdrop-filter - просто полупрозрачная панель */
-}
-
-/* Кнопки навигации в начало/конец - МЕНЬШЕЕ СВЕЧЕНИЕ */
-.nav-btn {
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  font-size: 16px;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  transform: scale(1);
-  border: none;
-  position: relative;
-  -webkit-tap-highlight-color: transparent; /* Убираем синий highlight на тап */
-}
-
-/* На мобильных устройствах - НЕ РЫЖИЕ КНОПКИ */
-@media (hover: hover) {
-  .nav-btn:hover {
-    background: rgba(255, 165, 0, 0.9);
-    color: #000;
-    transform: scale(1.15);
-    /* Меньшее свечение при наведении */
-    box-shadow: 
-      0 0 12px rgba(255, 165, 0, 0.6),
-      0 0 24px rgba(255, 165, 0, 0.3);
-  }
-}
-
-.nav-btn:active {
-  /* После нажатия возвращаемся к черному */
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  transform: scale(0.95);
-  box-shadow: none;
-  transition: all 0.1s ease;
-}
-
-/* Кнопки зума - МЕНЬШЕЕ СВЕЧЕНИЕ */
-.zoom-btn {
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  font-size: 24px;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 300;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  transform: scale(1);
-  border: none;
-  position: relative;
-  -webkit-tap-highlight-color: transparent; /* Убираем синий highlight на тап */
-}
-
-/* На мобильных устройствах - НЕ РЫЖИЕ КНОПКИ */
-@media (hover: hover) {
-  .zoom-btn:hover {
-    background: rgba(255, 165, 0, 0.9);
-    color: #000;
-    transform: scale(1.15);
-    /* Меньшее свечение при наведении */
-    box-shadow: 
-      0 0 12px rgba(255, 165, 0, 0.6),
-      0 0 24px rgba(255, 165, 0, 0.3);
-  }
-}
-
-.zoom-btn:active {
-  /* После нажатия возвращаемся к черному */
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  transform: scale(0.95);
-  box-shadow: none;
-  transition: all 0.1s ease;
-}
-
-button {
-  background: transparent;
-  color: #fff;
-  border: none;
-  padding: 0;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 16px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  min-width: 44px;
-  height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  transform: scale(1);
-  -webkit-tap-highlight-color: transparent; /* Убираем синий highlight на тап */
-}
-
-/* На мобильных устройствах - НЕ РЫЖИЕ КНОПКИ */
-@media (hover: hover) {
-  button:hover {
-    transform: scale(1.15);
-  }
-}
-
-button:active {
-  transform: scale(0.95);
-  transition: transform 0.1s ease;
-}
-
-#pageInfo {
-  font-size: 14px;
-  font-weight: 500;
-  padding: 0 20px;
-  min-width: 90px;
-  text-align: center;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 25px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  margin: 0 10px;
-  letter-spacing: 0.3px;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-}
-
-/* Адаптивность - ИСПРАВЛЕННАЯ ДЛЯ МОБИЛЬНЫХ */
+/* ================= АДАПТИВНОСТЬ ================= */
 @media (max-width: 768px) {
   .comic-reader {
     height: 100vh !important;
   }
   
   .header {
-    padding: 10px !important;
+    padding: 12px 15px;
     min-height: 50px;
   }
   
@@ -426,10 +259,11 @@ button:active {
     font-size: 16px;
   }
   
-  .header-btn {
-    width: 32px;
-    height: 32px;
-    font-size: 12px;
+  .header-page-info {
+    font-size: 14px;
+    padding: 6px 12px;
+    min-width: 70px;
+    border-radius: 18px;
   }
   
   .panels-visible .progress {
@@ -438,6 +272,24 @@ button:active {
   
   .panels-hidden .progress {
     bottom: 0;
+  }
+  
+  .controls {
+    padding: 10px 0 !important;
+    gap: 8px !important;
+    min-height: 50px !important;
+    background: rgba(10, 10, 10, 0.95) !important;
+  }
+  
+  .nav-btn {
+    min-width: 36px !important;
+    height: 36px !important;
+    width: 36px !important;
+    font-size: 14px !important;
+  }
+  
+  .progress {
+    height: 4px !important;
   }
   
   /* Фикс для безопасных зон на iOS */
@@ -471,57 +323,6 @@ button:active {
     .panels-visible .progress {
       bottom: calc(50px + env(safe-area-inset-bottom, 0px)) !important;
     }
-    
-    .zoom-indicator {
-      position: fixed !important;
-      bottom: calc(100px + env(safe-area-inset-bottom, 0px)) !important;
-      z-index: 10000 !important;
-    }
-  }
-  
-  .controls {
-    padding: 10px 0 !important;
-    gap: 8px !important;
-    min-height: 50px !important;
-    background: rgba(10, 10, 10, 0.8) !important;
-    display: flex !important;
-  }
-  
-  .zoom-indicator {
-    bottom: 65px !important;
-    padding: 8px 16px !important;
-    font-size: 14px !important;
-    border-radius: 20px !important;
-    min-width: 80px !important;
-  }
-  
-  button, .nav-btn, .zoom-btn, .header-btn {
-    min-width: 36px !important;
-    height: 36px !important;
-    width: 36px !important;
-    font-size: 14px !important;
-  }
-  
-  .nav-btn, .zoom-btn {
-    width: 36px !important;
-    height: 36px !important;
-  }
-  
-  .zoom-btn {
-    font-size: 20px !important;
-  }
-  
-  #pageInfo {
-    font-size: 12px !important;
-    min-width: 70px !important;
-    padding: 0 14px !important;
-    height: 36px !important;
-    border-radius: 20px !important;
-    margin: 0 8px !important;
-  }
-  
-  .progress {
-    height: 4px !important;
   }
 }
 
@@ -535,10 +336,11 @@ button:active {
     font-size: 14px;
   }
   
-  .header-btn {
-    width: 30px;
-    height: 30px;
-    font-size: 11px;
+  .header-page-info {
+    font-size: 12px;
+    padding: 5px 10px;
+    min-width: 65px;
+    border-radius: 16px;
   }
   
   .panels-visible .progress {
@@ -551,32 +353,11 @@ button:active {
     min-height: 48px !important;
   }
   
-  .zoom-indicator {
-    bottom: 60px !important;
-    padding: 6px 12px !important;
-    font-size: 13px !important;
-    border-radius: 18px !important;
-    min-width: 70px !important;
-  }
-  
-  #pageInfo {
-    min-width: 65px !important;
-    font-size: 11px !important;
-    padding: 0 12px !important;
-    height: 34px !important;
-    border-radius: 18px !important;
-    margin: 0 6px !important;
-  }
-  
-  button, .nav-btn, .zoom-btn, .header-btn {
+  .nav-btn {
     min-width: 34px !important;
     height: 34px !important;
     width: 34px !important;
     font-size: 13px !important;
-  }
-  
-  .zoom-btn {
-    font-size: 18px !important;
   }
   
   .progress {
