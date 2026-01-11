@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "comics": [
+    {
+      "id": "test-comic",
+      "title": "Test Comic",
+      "pageCount": 3,
+      "path": "/my-comic/comics/test/"
+    }
+  ]
+}
