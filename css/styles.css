@@ -241,6 +241,53 @@ html, body {
   pointer-events: none;
 }
 
+/* ================= ИКОНКИ ================= */
+.icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  filter: invert(0); /* Оставляем белыми */
+  transition: filter 0.3s ease;
+}
+
+/* На компьютерах при наведении */
+@media (hover: hover) {
+  .nav-btn:hover .icon {
+    filter: invert(1); /* При наведении делаем чёрными */
+  }
+}
+
+/* Активное состояние кнопки автоскролла */
+.auto-scroll-btn.active .icon {
+  filter: invert(1); /* Когда активен - чёрная иконка */
+}
+
+/* ФИКС ДЛЯ МОБИЛЬНЫХ УСТРОЙСТВ - предотвращаем залипание :active */
+@media (hover: none) and (pointer: coarse) {
+  /* Убираем :active эффект для иконок на тач-устройствах */
+  .nav-btn:active .icon {
+    filter: invert(0) !important; /* Всегда белые при нажатии */
+  }
+  
+  /* Убираем :hover эффекты на тач-устройствах */
+  .nav-btn:hover .icon {
+    filter: invert(0) !important; /* Отключаем hover эффекты */
+  }
+  
+  /* Убираем hover эффекты для кнопок на тач-устройствах */
+  .nav-btn:hover {
+    background: rgba(0, 0, 0, 0.5) !important;
+    transform: scale(1) !important;
+    box-shadow: none !important;
+  }
+  
+  /* Оставляем только анимацию нажатия для кнопок */
+  .nav-btn:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+  }
+}
+
 /* ================= АДАПТИВНОСТЬ ================= */
 @media (max-width: 768px) {
   .comic-reader {
@@ -248,7 +295,7 @@ html, body {
   }
   
   .header {
-    padding: 12px 15px;
+    padding: 12px 15px !important;
     min-height: 50px;
   }
   
@@ -258,7 +305,7 @@ html, body {
   
   .header-page-info {
     font-size: 14px;
-    padding: 6px 12px;
+    padding: 6px 12px !important;
     min-width: 70px;
     border-radius: 18px;
   }
@@ -285,6 +332,11 @@ html, body {
     font-size: 18px !important; /* Увеличено с 14px */
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+  }
+  
+  .icon {
+    width: 20px;
+    height: 20px;
   }
   
   .progress {
@@ -337,7 +389,7 @@ html, body {
   
   .header-page-info {
     font-size: 12px;
-    padding: 5px 10px;
+    padding: 5px 10px !important;
     min-width: 65px;
     border-radius: 16px;
   }
@@ -348,7 +400,7 @@ html, body {
   
   .controls {
     gap: 10px !important; /* Увеличено с 6px */
-    padding: 8px 0 !important; /* Увеличено с 8px */
+    padding: 12px 0 !important; /* Увеличено с 8px */
     min-height: 60px !important; /* Увеличено с 48px */
   }
   
@@ -359,12 +411,18 @@ html, body {
     font-size: 17px !important; /* Увеличено с 13px */
   }
   
+  .icon {
+    width: 18px;
+    height: 18px;
+  }
+  
   .progress {
     height: 4px !important; /* Увеличено с 3px */
   }
+  
   .panels-visible .progress {
     bottom: 60px !important; 
-}
+  }
 }
 
 /* ================= LOADING SCREEN ================= */
@@ -416,26 +474,6 @@ html, body {
   100% { transform: rotate(360deg); }
 }
 
-.icon {
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
-  filter: invert(0); /* Делаем белыми, т.к. кнопки темные */
-  transition: filter 0.3s ease;
-}
-
-.nav-btn:hover .icon {
-  filter: invert(1); /* При наведении делаем чёрными, т.к. кнопка становится оранжевой */
-}
-
-.nav-btn:active .icon {
-    filter: invert(0) !important; /* Или ваше исходное значение */
-  }
-
-.auto-scroll-btn.active .icon {
-  filter: invert(1); /* Когда активен - чёрная иконка */
-}
-
 /* Адаптивность для Loading Screen */
 @media (max-width: 768px) {
   .loading-spinner {
@@ -447,11 +485,6 @@ html, body {
   .loading-text {
     font-size: 14px;
   }
-  .icon {
-    width: 20px;
-    height: 20px;
-  }
-  
 }
 
 @media (max-width: 480px) {
@@ -464,12 +497,4 @@ html, body {
   .loading-text {
     font-size: 13px;
   }
-
-  .icon {
-    width: 18px;
-    height: 18px;
-  }
 }
-
-
-
