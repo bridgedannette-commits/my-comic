@@ -19,6 +19,7 @@
   <div class="header-wrapper" id="headerWrapper">
     <div class="header">
       <div class="comic-title" id="comicTitle">Мой Комикс</div>
+      <div class="header-page-info" id="headerPageInfo">– / –</div>
     </div>
   </div>
 
@@ -28,7 +29,7 @@
   <div class="controls-wrapper" id="controlsWrapper">
     <div class="controls">
       <button id="toTop" class="nav-btn">▲</button>
-      <span id="pageInfo">– / –</span>
+      <button id="autoScroll" class="nav-btn auto-scroll-btn">▽</button>
       <button id="toBottom" class="nav-btn">▼</button>
     </div>
   </div>
@@ -50,17 +51,22 @@ const COMIC_TITLE = 'Мой Комикс'; // Название комикса
 /* ================= СОСТОЯНИЕ ================= */
 let pages = [];
 const wrapper = document.getElementById('canvasWrapper');
-const pageInfo = document.getElementById('pageInfo');
 const progressBar = document.getElementById('progressBar');
 const headerWrapper = document.getElementById('headerWrapper');
 const controlsWrapper = document.getElementById('controlsWrapper');
 const comicTitle = document.getElementById('comicTitle');
+const headerPageInfo = document.getElementById('headerPageInfo');
 const reader = document.getElementById('reader');
 
 // Таймеры для скрытия панелей
 let hidePanelsTimeout;
 let panelsVisible = true;
 const HIDE_PANELS_DELAY = 3000; // 3 секунды до скрытия
+
+// Автоскролл
+let autoScrollInterval = null;
+const AUTO_SCROLL_SPEED = 100; // фиксированная скорость (пикселей в секунду)
+let autoScrollActive = false;
 
 /* ================= ФУНКЦИИ ДЛЯ ПАНЕЛЕЙ ================= */
 function showPanels() {
@@ -94,6 +100,65 @@ function togglePanels() {
     hidePanels();
   } else {
     showPanels();
+  }
+}
+
+/* ================= ФУНКЦИИ АВТОСКРОЛЛА ================= */
+function startAutoScroll() {
+  if (autoScrollInterval) {
+    clearInterval(autoScrollInterval);
+  }
+  
+  autoScrollActive = true;
+  updateAutoScrollButton();
+  
+  autoScrollInterval = setInterval(() => {
+    const currentScroll = wrapper.scrollTop;
+    const maxScroll = wrapper.scrollHeight - wrapper.clientHeight;
+    
+    // Если достигли конца, останавливаем автоскролл
+    if (currentScroll >= maxScroll - 1) {
+      stopAutoScroll();
+      return;
+    }
+    
+    // Плавный скролл с фиксированной скоростью
+    const scrollAmount = AUTO_SCROLL_SPEED / 60; // делим на 60 кадров в секунду
+    wrapper.scrollBy({ top: scrollAmount, behavior: 'instant' });
+    
+    // Если достигли конца после скролла
+    if (wrapper.scrollTop >= maxScroll - 1) {
+      stopAutoScroll();
+    }
+  }, 1000 / 60); // 60 FPS
+}
+
+function stopAutoScroll() {
+  if (autoScrollInterval) {
+    clearInterval(autoScrollInterval);
+    autoScrollInterval = null;
+  }
+  autoScrollActive = false;
+  updateAutoScrollButton();
+}
+
+function toggleAutoScroll() {
+  if (autoScrollActive) {
+    stopAutoScroll();
+  } else {
+    startAutoScroll();
+  }
+  showPanels();
+}
+
+function updateAutoScrollButton() {
+  const autoScrollBtn = document.getElementById('autoScroll');
+  if (autoScrollActive) {
+    autoScrollBtn.innerHTML = '■';
+    autoScrollBtn.classList.add('active');
+  } else {
+    autoScrollBtn.innerHTML = '▽';
+    autoScrollBtn.classList.remove('active');
   }
 }
 
@@ -227,7 +292,7 @@ function getCurrentPage() {
 
 function updatePageInfo() {
   const current = getCurrentPage();
-  pageInfo.textContent = `${current} / ${pages.length}`;
+  headerPageInfo.textContent = `${current} / ${pages.length}`;
 }
 
 function updateScrollInfo() {
@@ -242,15 +307,21 @@ function updateScrollInfo() {
 /* ================= СОБЫТИЯ ================= */
 document.getElementById('toTop').onclick = () => {
   wrapper.scrollTo({ top: 0, behavior: 'smooth' });
+  stopAutoScroll(); // Останавливаем автоскролл при навигации
   showPanels();
 };
 
 document.getElementById('toBottom').onclick = () => {
   wrapper.scrollTo({ top: wrapper.scrollHeight, behavior: 'smooth' });
+  stopAutoScroll(); // Останавливаем автоскролл при навигации
   showPanels();
 };
 
-// Клик по области комикса показывает/скрывает панели
+document.getElementById('autoScroll').onclick = () => {
+  toggleAutoScroll();
+};
+
+// Клик по области комикса показывает/скрывает панели (НЕ останавливает автоскролл)
 wrapper.addEventListener('click', (e) => {
   // Не реагируем на клики по кнопкам и другим интерактивным элементам
   if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
@@ -262,6 +333,7 @@ wrapper.addEventListener('click', (e) => {
     return;
   }
   
+  // Убрали остановку автоскролла при клике на комикс
   togglePanels();
 });
 
@@ -298,6 +370,7 @@ wrapper.addEventListener('touchend', (e) => {
       return;
     }
     
+    // Убрали остановку автоскролла при тапе на комикс
     togglePanels();
     e.preventDefault();
   }
@@ -352,19 +425,29 @@ document.addEventListener('keydown', (e) => {
     case ' ':
       e.preventDefault();
       wrapper.scrollBy({ top: wrapper.clientHeight * 0.8, behavior: 'smooth' });
+      stopAutoScroll(); // Останавливаем автоскролл при ручной навигации
       break;
     case 'ArrowUp':
     case 'PageUp':
       e.preventDefault();
       wrapper.scrollBy({ top: -wrapper.clientHeight * 0.8, behavior: 'smooth' });
+      stopAutoScroll(); // Останавливаем автоскролл при ручной навигации
       break;
     case 'Home':
       e.preventDefault();
       wrapper.scrollTo({ top: 0, behavior: 'smooth' });
+      stopAutoScroll();
       break;
     case 'End':
       e.preventDefault();
       wrapper.scrollTo({ top: wrapper.scrollHeight, behavior: 'smooth' });
+      stopAutoScroll();
+      break;
+    case 'a':
+    case 'A':
+      // Клавиша A для включения/выключения автоскролла
+      e.preventDefault();
+      toggleAutoScroll();
       break;
     case 'f':
     case 'F':
