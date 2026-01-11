@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" 
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Комикс</title>
+<title>Comic Viewer</title>
 
 <link rel="stylesheet" href="css/styles.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -93,45 +93,58 @@
 <div class="loading-screen" id="loadingScreen">
   <div class="loading-content">
     <div class="loading-spinner"></div>
-    <div class="loading-text">Загрузка комикса...</div>
+    <div class="loading-text">Loading comic...</div>
   </div>
 </div>
 
 <div class="comic-reader" id="reader">
-  <!-- Верхняя панель -->
+  <!-- Top panel -->
   <div class="header-wrapper" id="headerWrapper">
     <div class="header">
-      <div class="comic-title" id="comicTitle">Мой Комикс</div>
+      <div class="comic-title" id="comicTitle">Loading...</div>
       <div class="header-page-info" id="headerPageInfo">– / –</div>
     </div>
   </div>
 
   <div class="canvas-wrapper" id="canvasWrapper"></div>
 
-  <!-- Нижняя панель -->
+  <!-- Bottom panel -->
   <div class="controls-wrapper" id="controlsWrapper">
     <div class="controls">
       <button id="toTop" class="nav-btn">▲</button>
-      <button id="autoScroll" class="nav-btn auto-scroll-btn" title="Автоскролл">▽</button>
+      <button id="autoScroll" class="nav-btn auto-scroll-btn" title="Autoscroll">▽</button>
       <button id="toBottom" class="nav-btn">▼</button>
     </div>
   </div>
 
-  <!-- Прогресс-бар -->
+  <!-- Progress bar -->
   <div class="progress">
     <div class="progress-bar" id="progressBar"></div>
   </div>
 </div>
 
 <script>
-/* ================= КОНФИГ ================= */
-const COMIC_PATH = 'https://bridgedannette-commits.github.io/my-comic/comics/test/';
+/* ================= URL PARSING ================= */
+function getUrlParams() {
+  const params = new URLSearchParams(window.location.search);
+  const comicId = params.get('comic');
+  
+  // If comic parameter exists, use it
+  if (comicId) {
+    return { comicId };
+  }
+  
+  // Otherwise return null (will use first comic from manifest)
+  return null;
+}
+
+/* ================= CONFIG ================= */
 const IMAGE_EXTS = ['webp', 'png', 'jpg', 'jpeg'];
 const MAX_PAGES_SAFE = 500;
 const isMobile = window.innerWidth <= 768;
-const COMIC_TITLE = 'Мой Комикс'; // Название комикса
+const MANIFEST_PATH = 'manifest.json'; // Path to manifest file
 
-/* ================= СОСТОЯНИЕ ================= */
+/* ================= STATE ================= */
 let pages = [];
 const wrapper = document.getElementById('canvasWrapper');
 const progressBar = document.getElementById('progressBar');
@@ -142,17 +155,90 @@ const headerPageInfo = document.getElementById('headerPageInfo');
 const reader = document.getElementById('reader');
 const loadingScreen = document.getElementById('loadingScreen');
 
-// Таймеры для скрытия панелей
+// Timers for hiding panels
 let hidePanelsTimeout;
 let panelsVisible = true;
-const HIDE_PANELS_DELAY = 3000; // 3 секунды до скрытия
+const HIDE_PANELS_DELAY = 3000; // 3 seconds before hiding
 
-// Автоскролл
+// Autoscroll
 let autoScrollInterval = null;
-const AUTO_SCROLL_SPEED = 150; // фиксированная скорость (пикселей в секунду)
+const AUTO_SCROLL_SPEED = 150; // fixed speed (pixels per second)
 let autoScrollActive = false;
 
-/* ================= ФУНКЦИИ ДЛЯ ПАНЕЛЕЙ ================= */
+/* ================= MANIFEST LOADING ================= */
+async function loadManifest() {
+  try {
+    const response = await fetch(MANIFEST_PATH);
+    if (!response.ok) throw new Error(`Failed to load manifest: ${response.status}`);
+    const manifest = await response.json();
+    
+    // Validate manifest structure
+    if (!manifest.comics || !Array.isArray(manifest.comics)) {
+      throw new Error('Invalid manifest format: missing comics array');
+    }
+    
+    return manifest;
+  } catch (error) {
+    console.error('Manifest loading error:', error);
+    
+    // Fallback to default manifest with test comic
+    return {
+      version: "1.0",
+      comics: [
+        {
+          id: 'test-comic',
+          title: 'Test Comic',
+          pageCount: 15,
+          path: '/my-comic/comics/test/'
+        }
+      ]
+    };
+  }
+}
+
+async function getComicData() {
+  // 1. Load manifest
+  const manifest = await loadManifest();
+  
+  // 2. Get comic ID from URL
+  const urlParams = getUrlParams();
+  const requestedComicId = urlParams ? urlParams.comicId : null;
+  
+  // 3. Find comic in manifest
+  let comicData;
+  
+  if (requestedComicId) {
+    // Look for requested comic
+    comicData = manifest.comics.find(c => c.id === requestedComicId);
+    if (!comicData) {
+      throw new Error(`Comic "${requestedComicId}" not found in manifest`);
+    }
+  } else if (manifest.comics.length > 0) {
+    // Use first comic as default
+    comicData = manifest.comics[0];
+  } else {
+    throw new Error('No comics available in manifest');
+  }
+  
+  // Validate comic data
+  if (!comicData.path) {
+    throw new Error('Comic path is missing in manifest');
+  }
+  
+  if (!comicData.pageCount || comicData.pageCount <= 0) {
+    throw new Error('Invalid page count in manifest');
+  }
+  
+  // Ensure path ends with slash
+  const normalizedPath = comicData.path.endsWith('/') ? comicData.path : comicData.path + '/';
+  
+  return {
+    ...comicData,
+    path: normalizedPath
+  };
+}
+
+/* ================= PANEL FUNCTIONS ================= */
 function showPanels() {
   if (!panelsVisible) {
     headerWrapper.classList.remove('hidden');
@@ -187,7 +273,7 @@ function togglePanels() {
   }
 }
 
-/* ================= ФУНКЦИИ АВТОСКРОЛЛА ================= */
+/* ================= AUTOSCROLL FUNCTIONS ================= */
 function startAutoScroll() {
   if (autoScrollInterval) {
     clearInterval(autoScrollInterval);
@@ -200,17 +286,17 @@ function startAutoScroll() {
     const currentScroll = wrapper.scrollTop;
     const maxScroll = wrapper.scrollHeight - wrapper.clientHeight;
     
-    // Если достигли конца, останавливаем автоскролл
+    // If reached the end, stop autoscroll
     if (currentScroll >= maxScroll - 1) {
       stopAutoScroll();
       return;
     }
     
-    // Плавный скролл с фиксированной скоростью
-    const scrollAmount = AUTO_SCROLL_SPEED / 60; // делим на 60 кадров в секунду
+    // Smooth scroll with fixed speed
+    const scrollAmount = AUTO_SCROLL_SPEED / 60; // divide by 60 frames per second
     wrapper.scrollBy({ top: scrollAmount, behavior: 'instant' });
     
-    // Если достигли конца после скролла
+    // If reached the end after scrolling
     if (wrapper.scrollTop >= maxScroll - 1) {
       stopAutoScroll();
     }
@@ -240,15 +326,15 @@ function updateAutoScrollButton() {
   if (autoScrollActive) {
     autoScrollBtn.innerHTML = '■';
     autoScrollBtn.classList.add('active');
-    autoScrollBtn.title = 'Автоскролл - нажмите для остановки';
+    autoScrollBtn.title = 'Autoscroll - click to stop';
   } else {
     autoScrollBtn.innerHTML = '▽';
     autoScrollBtn.classList.remove('active');
-    autoScrollBtn.title = 'Автоскролл - нажмите для начала';
+    autoScrollBtn.title = 'Autoscroll - click to start';
   }
 }
 
-/* ================= ЗАГРУЗКА КОМИКСА ================= */
+/* ================= IMAGE LOADING ================= */
 async function imageExists(url) {
   try {
     const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
@@ -258,130 +344,174 @@ async function imageExists(url) {
   }
 }
 
-async function detectPages() {
+async function detectPages(comicPath, pageCount) {
   const result = [];
-  let pageNum = 1;
-
-  while (pageNum <= MAX_PAGES_SAFE) {
+  
+  // First, try to use the pageCount from manifest
+  for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
     let found = false;
-
+    
     for (const ext of IMAGE_EXTS) {
-      const url = `${COMIC_PATH}${pageNum}.${ext}`;
+      const url = `${comicPath}${pageNum}.${ext}`;
       if (await imageExists(url)) {
         result.push({ url, num: pageNum });
         found = true;
         break;
       }
     }
-
-    if (!found) break;
-    pageNum++;
+    
+    // If no image found for this page number, stop
+    if (!found) {
+      console.warn(`Page ${pageNum} not found, stopping detection`);
+      break;
+    }
   }
+  
+  // If no pages found with manifest pageCount, try auto-detection
+  if (result.length === 0) {
+    console.log('Trying auto-detection...');
+    let pageNum = 1;
+    
+    while (pageNum <= MAX_PAGES_SAFE) {
+      let found = false;
 
+      for (const ext of IMAGE_EXTS) {
+        const url = `${comicPath}${pageNum}.${ext}`;
+        if (await imageExists(url)) {
+          result.push({ url, num: pageNum });
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) break;
+      pageNum++;
+    }
+  }
+  
   return result;
 }
 
 async function loadComic() {
-  // Показываем loading screen
+  // Show loading screen
   loadingScreen.classList.remove('hidden');
   
-  wrapper.innerHTML = '<div style="color:#ccc;text-align:center;padding:50px;">Загрузка...</div>';
-  
-  pages = await detectPages();
-  
-  if (pages.length === 0) {
-    wrapper.innerHTML = '<div style="color:#fff;text-align:center;padding:50px;">Комикс не найден</div>';
-    // Скрываем loading screen при ошибке
+  try {
+    // 1. Get comic data from manifest
+    const comicData = await getComicData();
+    
+    // 2. Update title
+    comicTitle.textContent = comicData.title;
+    document.title = `${comicData.title} - Comic Viewer`;
+    
+    // 3. Show initial loading message
+    wrapper.innerHTML = '<div style="color:#ccc;text-align:center;padding:50px;">Loading pages...</div>';
+    
+    // 4. Detect and load pages
+    pages = await detectPages(comicData.path, comicData.pageCount);
+    
+    if (pages.length === 0) {
+      throw new Error(`No images found at path: ${comicData.path}`);
+    }
+    
+    // 5. Clear and create page containers
+    wrapper.innerHTML = '';
+    
+    pages.forEach((page, index) => {
+      const container = document.createElement('div');
+      container.className = 'page-container';
+      container.dataset.page = page.num;
+      container.style.margin = '0 auto';
+      
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.draggable = false;
+      img.alt = `Page ${page.num}`;
+      img.style.display = 'block';
+      img.style.margin = '0 auto';
+      img.style.maxWidth = '100%';
+      img.style.height = 'auto';
+      
+      // Auto size
+      img.onload = function() {
+        const maxWidth = isMobile ? 
+          Math.min(800, window.innerWidth - 20) : 
+          Math.min(1000, window.innerWidth * 0.95);
+        
+        if (this.naturalWidth > maxWidth) {
+          const scale = maxWidth / this.naturalWidth;
+          this.style.width = maxWidth + 'px';
+          this.style.height = (this.naturalHeight * scale) + 'px';
+          container.style.width = maxWidth + 'px';
+        } else {
+          this.style.width = this.naturalWidth + 'px';
+          container.style.width = this.naturalWidth + 'px';
+        }
+      };
+      
+      // Lazy load: first 5 images load immediately, others use data-src
+      if (index < 5) {
+        img.src = page.url;
+      } else {
+        img.dataset.src = page.url;
+      }
+      
+      container.appendChild(img);
+      wrapper.appendChild(container);
+    });
+    
+    // 6. Initialize panel state
+    reader.classList.add('panels-visible');
+    
+    updatePageInfo();
+    
+    // 7. Wait for all images to load
+    const images = wrapper.querySelectorAll('img');
+    let loadedCount = 0;
+    
+    if (images.length === 0) {
+      setTimeout(() => {
+        loadingScreen.classList.add('hidden');
+      }, 300);
+    } else {
+      images.forEach(img => {
+        if (img.complete) {
+          loadedCount++;
+          checkAllImagesLoaded(loadedCount, images.length);
+        } else {
+          img.addEventListener('load', () => {
+            loadedCount++;
+            checkAllImagesLoaded(loadedCount, images.length);
+          });
+          img.addEventListener('error', () => {
+            loadedCount++;
+            checkAllImagesLoaded(loadedCount, images.length);
+          });
+        }
+      });
+    }
+    
+    // 8. Load remaining images
+    setTimeout(() => {
+      wrapper.querySelectorAll('img[data-src]').forEach(img => {
+        img.src = img.dataset.src;
+        delete img.dataset.src;
+      });
+    }, 100);
+    
+  } catch (error) {
+    console.error('Comic loading error:', error);
+    
+    wrapper.innerHTML = `<div style="color:#fff;text-align:center;padding:50px;">
+      <h3>Error loading comic</h3>
+      <p style="color:#ccc;margin:10px 0;">${error.message}</p>
+      <p><a href="?" style="color:#FFA500;">Return to comics list</a></p>
+    </div>`;
+    
     setTimeout(() => {
       loadingScreen.classList.add('hidden');
     }, 500);
-    return;
   }
-  
-  wrapper.innerHTML = '';
-  
-  pages.forEach((page, index) => {
-    const container = document.createElement('div');
-    container.className = 'page-container';
-    container.dataset.page = page.num;
-    container.style.margin = '0 auto';
-    
-    const img = document.createElement('img');
-    img.loading = 'lazy';
-    img.draggable = false;
-    img.alt = `Страница ${page.num}`;
-    img.style.display = 'block';
-    img.style.margin = '0 auto';
-    img.style.maxWidth = '100%';
-    img.style.height = 'auto';
-    
-    // Автоматический размер
-    img.onload = function() {
-      const maxWidth = isMobile ? 
-        Math.min(800, window.innerWidth - 20) : 
-        Math.min(1000, window.innerWidth * 0.95);
-      
-      if (this.naturalWidth > maxWidth) {
-        const scale = maxWidth / this.naturalWidth;
-        this.style.width = maxWidth + 'px';
-        this.style.height = (this.naturalHeight * scale) + 'px';
-        container.style.width = maxWidth + 'px';
-      } else {
-        this.style.width = this.naturalWidth + 'px';
-        container.style.width = this.naturalWidth + 'px';
-      }
-    };
-    
-    if (index < 5) {
-      img.src = page.url;
-    } else {
-      img.dataset.src = page.url;
-    }
-    
-    container.appendChild(img);
-    wrapper.appendChild(container);
-  });
-  
-  // Устанавливаем название комикса
-  comicTitle.textContent = COMIC_TITLE;
-  
-  // Инициализируем состояние панелей
-  reader.classList.add('panels-visible');
-  
-  updatePageInfo();
-  
-  // Ждем загрузки всех изображений
-  const images = wrapper.querySelectorAll('img');
-  let loadedCount = 0;
-  
-  if (images.length === 0) {
-    setTimeout(() => {
-      loadingScreen.classList.add('hidden');
-    }, 300);
-  } else {
-    images.forEach(img => {
-      if (img.complete) {
-        loadedCount++;
-        checkAllImagesLoaded(loadedCount, images.length);
-      } else {
-        img.addEventListener('load', () => {
-          loadedCount++;
-          checkAllImagesLoaded(loadedCount, images.length);
-        });
-        img.addEventListener('error', () => {
-          loadedCount++;
-          checkAllImagesLoaded(loadedCount, images.length);
-        });
-      }
-    });
-  }
-  
-  setTimeout(() => {
-    wrapper.querySelectorAll('img[data-src]').forEach(img => {
-      img.src = img.dataset.src;
-      delete img.dataset.src;
-    });
-  }, 100);
 }
 
 function checkAllImagesLoaded(loaded, total) {
@@ -392,7 +522,7 @@ function checkAllImagesLoaded(loaded, total) {
   }
 }
 
-/* ================= НАВИГАЦИЯ ================= */
+/* ================= NAVIGATION ================= */
 function getCurrentPage() {
   const containers = wrapper.querySelectorAll('.page-container');
   if (containers.length === 0) return 1;
@@ -431,16 +561,16 @@ function updateScrollInfo() {
   updatePageInfo();
 }
 
-/* ================= СОБЫТИЯ ================= */
+/* ================= EVENTS ================= */
 document.getElementById('toTop').onclick = () => {
   wrapper.scrollTo({ top: 0, behavior: 'smooth' });
-  stopAutoScroll(); // Останавливаем автоскролл при навигации
+  stopAutoScroll(); // Stop autoscroll on navigation
   showPanels();
 };
 
 document.getElementById('toBottom').onclick = () => {
   wrapper.scrollTo({ top: wrapper.scrollHeight, behavior: 'smooth' });
-  stopAutoScroll(); // Останавливаем автоскролл при навигации
+  stopAutoScroll(); // Stop autoscroll on navigation
   showPanels();
 };
 
@@ -448,14 +578,14 @@ document.getElementById('autoScroll').onclick = () => {
   toggleAutoScroll();
 };
 
-// Клик по области комикса показывает/скрывает панели (НЕ останавливает автоскролл)
+// Click on comic area shows/hides panels (does NOT stop autoscroll)
 wrapper.addEventListener('click', (e) => {
-  // Не реагируем на клики по кнопкам и другим интерактивным элементам
+  // Don't respond to clicks on buttons and other interactive elements
   if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
     return;
   }
   
-  // Не реагируем на клики по прогресс-бару
+  // Don't respond to clicks on progress bar
   if (e.target.closest('.progress')) {
     return;
   }
@@ -463,16 +593,16 @@ wrapper.addEventListener('click', (e) => {
   togglePanels();
 });
 
-// Тап на мобильных устройствах (для touch устройств)
+// Tap on mobile devices (for touch devices)
 wrapper.addEventListener('touchstart', (e) => {
-  // Сохраняем начальную точку тапа
+  // Save starting tap point
   e.tapStartX = e.touches[0].clientX;
   e.tapStartY = e.touches[0].clientY;
   e.isTap = true;
 }, { passive: true });
 
 wrapper.addEventListener('touchmove', (e) => {
-  // Если палец сдвинулся больше чем на 10px - это не тап, а свайп
+  // If finger moved more than 10px - it's not a tap, but a swipe
   const touch = e.touches[0];
   const diffX = Math.abs(touch.clientX - e.tapStartX);
   const diffY = Math.abs(touch.clientY - e.tapStartY);
@@ -483,15 +613,15 @@ wrapper.addEventListener('touchmove', (e) => {
 }, { passive: true });
 
 wrapper.addEventListener('touchend', (e) => {
-  // Если это был тап (не свайп) - показываем/скрываем панели
+  // If it was a tap (not swipe) - show/hide panels
   if (e.isTap) {
-    // Не реагируем на тапы по кнопкам
+    // Don't respond to taps on buttons
     const target = e.target;
     if (target.tagName === 'BUTTON' || target.closest('button')) {
       return;
     }
     
-    // Не реагируем на тапы по прогресс-бару
+    // Don't respond to taps on progress bar
     if (target.closest('.progress')) {
       return;
     }
@@ -501,7 +631,7 @@ wrapper.addEventListener('touchend', (e) => {
   }
 }, { passive: false });
 
-// При скролле колесиком мыши - НЕ показываем панели, только обновляем прогресс
+// On mouse wheel scroll - do NOT show panels, only update progress
 let scrollTimeout;
 wrapper.addEventListener('scroll', () => {
   const scrollHeight = wrapper.scrollHeight - wrapper.clientHeight;
@@ -514,7 +644,7 @@ wrapper.addEventListener('scroll', () => {
   scrollTimeout = setTimeout(updatePageInfo, 50);
 }, { passive: true });
 
-// Ресайз окна
+// Window resize
 let resizeTimeout;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimeout);
@@ -542,7 +672,7 @@ window.addEventListener('resize', () => {
   }, 250);
 });
 
-// Клавиатура
+// Keyboard
 document.addEventListener('keydown', (e) => {
   switch(e.key) {
     case 'ArrowDown':
@@ -550,13 +680,13 @@ document.addEventListener('keydown', (e) => {
     case ' ':
       e.preventDefault();
       wrapper.scrollBy({ top: wrapper.clientHeight * 0.8, behavior: 'smooth' });
-      stopAutoScroll(); // Останавливаем автоскролл при ручной навигации
+      stopAutoScroll(); // Stop autoscroll on manual navigation
       break;
     case 'ArrowUp':
     case 'PageUp':
       e.preventDefault();
       wrapper.scrollBy({ top: -wrapper.clientHeight * 0.8, behavior: 'smooth' });
-      stopAutoScroll(); // Останавливаем автоскролл при ручной навигации
+      stopAutoScroll(); // Stop autoscroll on manual navigation
       break;
     case 'Home':
       e.preventDefault();
@@ -570,44 +700,44 @@ document.addEventListener('keydown', (e) => {
       break;
     case 'a':
     case 'A':
-      // Клавиша A для включения/выключения автоскролла
+      // Key A to toggle autoscroll
       e.preventDefault();
       toggleAutoScroll();
       break;
     case 'f':
     case 'F':
-      // Клавиша F для переключения видимости панелей
+      // Key F to toggle panel visibility
       e.preventDefault();
       togglePanels();
       break;
   }
 });
 
-// При бездействии скрываем панели
+// Hide panels on inactivity
 resetHidePanelsTimer();
 
-/* ================= ЗАПУСК ================= */
+/* ================= INITIALIZATION ================= */
 document.addEventListener('DOMContentLoaded', () => {
-  // Фикс для мобильных
+  // Fix for mobile
   if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
     document.documentElement.style.height = '-webkit-fill-available';
     document.getElementById('reader').style.height = '-webkit-fill-available';
   }
   
-  // Блокируем скролл страницы
+  // Block page scroll
   document.documentElement.style.overflow = 'hidden';
   document.body.style.overflow = 'hidden';
   
-  // Загружаем комикс
+  // Load comic with manifest support
   loadComic();
 });
 
-// После полной загрузки
+// After full load
 window.addEventListener('load', () => {
   setTimeout(updatePageInfo, 100);
 });
 
-// Скрываем loading screen через 10 секунд максимум (на всякий случай)
+// Hide loading screen after 10 seconds maximum (just in case)
 setTimeout(() => {
   if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
     loadingScreen.classList.add('hidden');
