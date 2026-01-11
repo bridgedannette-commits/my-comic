@@ -283,6 +283,8 @@ html, body {
     height: 46px !important; /* Увеличено с 36px */
     width: 46px !important; /* Увеличено с 36px */
     font-size: 18px !important; /* Увеличено с 14px */
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
   
   .progress {
@@ -461,6 +463,23 @@ html, body {
   .icon {
     width: 18px;
     height: 18px;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .nav-btn {
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+  
+  .nav-btn:active {
+    transform: scale(0.95);
+    background: rgba(0, 0, 0, 0.5);
+    transition: transform 0.05s ease, background 0.05s ease;
+  }
+  
+  /* Быстрый сброс после нажатия */
+  .nav-btn:not(:active) {
+    transition: transform 0.3s ease, background 0.3s ease;
   }
 }
 
