@@ -108,7 +108,7 @@ html, body {
   overflow: hidden;
   white-space: nowrap;
   flex: 1;
-  text-align: center;
+  text-align: left; /* Изменено с center на left */
   padding: 0 10px;
 }
 
